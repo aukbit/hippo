@@ -4,6 +4,13 @@ import (
 	"time"
 )
 
+// EventService represents a service for managing events.
+type EventService interface {
+	CreateEvent(e *Event) error
+	GetEvent(aggregateID string, version int64) (*Event, error)
+	ListEvents(aggregateID string, lowestVersion, highestVersion int64) error
+}
+
 // Format enumerator
 type Format int32
 
@@ -40,11 +47,4 @@ type Event struct {
 	// Created has the identification of which service has created the event and
 	// respective timestamp at which the event ocurred
 	CreateTime time.Time
-}
-
-// EventService represents a service for managing events.
-type EventService interface {
-	CreateEvent(e *Event) error
-	GetEvent(aggregateID string, version int64) (*Event, error)
-	ListEvents(aggregateID string, lowestVersion, highestVersion int64) error
 }
