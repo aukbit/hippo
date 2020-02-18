@@ -21,7 +21,7 @@ type Client struct {
 	database string
 }
 
-// Config represents a configuration to initialize a new
+// Config represents a configuration to initialize a new InfluxDB
 type Config struct {
 	// Addr should be of the form "host:port", defaults to "localhost:8086"
 	Addr string
@@ -73,14 +73,10 @@ func (c *Client) Connect(conf Config) error {
 	if conf.Database == "" {
 		conf.Database = "hippodb"
 	}
-	// Create database
+
 	// Note: If you attempt to create a database that already exists,
 	// InfluxDB does nothing and does not return an error.
-	q := db.Query{
-		Command:  "create database",
-		Database: conf.Database,
-	}
-	if _, err := c.db.Query(q); err != nil {
+	if _, err := c.db.Query(c.Query("create database")); err != nil {
 		return err
 	}
 	return nil
@@ -92,6 +88,28 @@ func (c *Client) Close() error {
 		return c.db.Close()
 	}
 	return nil
+}
+
+// Query returns Query struct with command instruction to performed at InfluxDB
+func (c *Client) Query(command string) db.Query {
+	return db.NewQuery(command, c.database, "")
+}
+
+// BatchPoints returns a BatchPoints interface based on the given config.
+func (c *Client) BatchPoints() (db.BatchPoints, error) {
+	bp, err := db.NewBatchPoints(db.BatchPointsConfig{Database: c.database})
+	if err != nil {
+		return nil, err
+	}
+	return bp, nil
+}
+
+// NewPoint returns a point with the given timestamp. If a timestamp is not
+// given, then data is sent to the database without a timestamp, in which case
+// the server will assign local time upon reception. NOTE: it is recommended to
+// send data with a timestamp.
+func (c *Client) NewPoint(name string, tags map[string]string, fields map[string]interface{}, t ...time.Time) (*db.Point, error) {
+	return db.NewPoint(name, tags, fields, t...)
 }
 
 // StoreService returns the store service associated with the client.

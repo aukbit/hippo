@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package internal;
 
-option go_package = "github.com/aukbit/hippo/internal";
+option go_package = "github.com/aukbit/hippo/influxdb/internal";
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/empty.proto";
