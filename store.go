@@ -8,6 +8,7 @@ import (
 
 // StoreService represents a service for managing an aggregate store.
 type StoreService interface {
+	New() *Store
 	Dispatch(ctx context.Context, msg Message, fns ...HookFn) (interface{}, error)
 	Load(ctx context.Context, id string, fromVersion, toVersion int64) error
 }

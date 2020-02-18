@@ -14,6 +14,7 @@ type StoreService struct {
 }
 
 func (s *StoreService) Dispatch(ctx context.Context, msg hippo.Message, fns ...hippo.HookFn) (interface{}, error) {
+
 	return nil, nil
 }
 
