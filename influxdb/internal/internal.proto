@@ -45,8 +45,7 @@ message Event {
     string origin_ip = 10;
     // Metadata
     map<string, string> metadata = 11;
-    // Created has the identification of which service has created the event and
-    // respective timestamp at which the event ocurred
+    // CreateTime timestamp when event ocurred, location should be set to UTC.
     google.protobuf.Timestamp create_time = 12;
     // ...
 }

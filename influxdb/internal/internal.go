@@ -40,7 +40,7 @@ func UnmarshalEvent(data []byte, e *hippo.Event) error {
 	e.AggregateID = pb.GetAggregateId()
 	e.Version = pb.GetVersion()
 	e.Schema = pb.GetSchema()
-	e.Format = hippo.Format(e.Format)
+	e.Format = hippo.Format(pb.GetFormat())
 	e.Data = pb.GetData()
 	e.Priority = pb.GetPriority()
 	e.Signature = pb.GetSignature()

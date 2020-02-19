@@ -79,8 +79,7 @@ type Event struct {
 	OriginIp string `protobuf:"bytes,10,opt,name=origin_ip,json=originIp,proto3" json:"origin_ip,omitempty"`
 	// Metadata
 	Metadata map[string]string `protobuf:"bytes,11,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	// Created has the identification of which service has created the event and
-	// respective timestamp at which the event ocurred
+	// CreateTime timestamp when event ocurred, location should be set to UTC.
 	CreateTime           *timestamp.Timestamp `protobuf:"bytes,12,opt,name=create_time,json=createTime,proto3" json:"create_time,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
 	XXX_unrecognized     []byte               `json:"-"`
