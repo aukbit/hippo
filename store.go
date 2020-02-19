@@ -7,6 +7,7 @@ import (
 // StoreService represents a service for managing an aggregate store.
 type StoreService interface {
 	CreateEvent(ctx context.Context, e *Event) error
+	GetLastVersion(ctx context.Context, aggregateID string) (int64, error)
 	ListEvents(ctx context.Context, p Params) ([]*Event, error)
 }
 
@@ -67,9 +68,10 @@ func (s *Store) apply(e *Event, fn DomainRulesFn) error {
 }
 
 // Dispatch ...
-func Dispatch(ctx context.Context, service StoreService, msg Message, rules DomainRulesFn, hooks ...HookFn) (*Store, error) {
+func Dispatch(ctx context.Context, service StoreService, msg Message,
+	rules DomainRulesFn, hooks ...HookFn) (*Store, error) {
 
-	// Fetch events from InfluxDB
+	// Fetch events from datastore
 	events, err := service.ListEvents(ctx, Params{ID: msg.ID})
 	if err != nil {
 		return nil, err
@@ -90,7 +92,21 @@ func Dispatch(ctx context.Context, service StoreService, msg Message, rules Doma
 		}
 	}
 
-	// Persist event into InfluxDB
+	// Do an optimistic concurrency test on the data coming in,
+	// if the expected version does not match the actual store version
+	// it will raise a concurrency exception
+	v, err := service.GetLastVersion(ctx, msg.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if store.Version != v {
+		return nil, ErrConcurrencyException
+	}
+	// Increment version by one and assign it to the new event
+	msg.Event.SetVersion(store.Version + 1)
+
+	// Persist event to datastore
 	if err := service.CreateEvent(ctx, msg.Event); err != nil {
 		return nil, err
 	}

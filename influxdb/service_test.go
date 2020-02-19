@@ -36,6 +36,39 @@ func TestStoreService_CreateEvent(t *testing.T) {
 
 }
 
+func TestStoreService_GetLastVersion(t *testing.T) {
+	c := MustConnectClient()
+	defer c.Close()
+
+	user := pb.User{
+		Id:    rand.String(10),
+		Name:  "test",
+		Email: "test@email.com",
+	}
+
+	// Create new event for user_created topic.
+	event := hippo.NewEvent("user_created", user.GetId(), nil)
+	// Marshal user proto and assign it to event data
+	if err := event.MarshalProto(&user); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+
+	// Create event in store.
+	if err := c.StoreService().CreateEvent(ctx, event); err != nil {
+		t.Fatal(err)
+	}
+
+	// Get last event version from store.
+	if n, err := c.StoreService().GetLastVersion(ctx, user.GetId()); err != nil {
+		t.Fatal(err)
+	} else if n != 0 {
+		t.Fatalf("unexpected version: %#v != 0", n)
+	}
+
+}
+
 func TestStoreService_ListEvents(t *testing.T) {
 	c := MustConnectClient()
 	defer c.Close()

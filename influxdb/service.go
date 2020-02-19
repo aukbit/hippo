@@ -20,28 +20,9 @@ type StoreService struct {
 	client *Client
 }
 
-// CreateEvent ..
+// CreateEvent persists the event.
 func (s *StoreService) CreateEvent(ctx context.Context, e *hippo.Event) error {
 	start := time.Now()
-
-	v, err := s.fetchLastVersion(ctx, e.AggregateID)
-	if err != nil {
-		return err
-	}
-
-	// Do an optimistic concurrency test on the data coming in,
-	// if the expected version does not match the actual version it will raise a concurrency exception
-	if e.Version != v {
-		return hippo.ErrConcurrencyException
-	}
-	// Increment aggregate version by one.
-	e.Version++
-
-	// NOTE: on migration events already bring timestamp otherwise timestamp
-	// should be set here
-	if e.CreateTime.IsZero() {
-		e.CreateTime = time.Now()
-	}
 
 	// Create a new batch points
 	bp, err := s.client.BatchPoints()
@@ -79,8 +60,10 @@ func (s *StoreService) CreateEvent(ctx context.Context, e *hippo.Event) error {
 	return nil
 }
 
-func (s *StoreService) fetchLastVersion(ctx context.Context, id string) (int64, error) {
-	cmd := fmt.Sprintf("select last(version) from events where aggregate_id='%s'", id)
+// GetLastVersion fetches the last version for the aggregate
+func (s *StoreService) GetLastVersion(ctx context.Context, aggregateID string) (int64, error) {
+	start := time.Now()
+	cmd := fmt.Sprintf("select last(version) from events where aggregate_id='%s'", aggregateID)
 	response, err := s.client.db.Query(s.client.Query(cmd))
 	if err != nil {
 		return 0, err
@@ -92,15 +75,16 @@ func (s *StoreService) fetchLastVersion(ctx context.Context, id string) (int64, 
 				if err != nil {
 					return 0, err
 				}
-				log.Printf("%s --> %d", cmd, n)
+				log.Printf("%s --> version %d - duration: %v", cmd, n, time.Now().Sub(start))
 				return n, nil
 			}
 		}
 	}
+	log.Printf("%s --> no events to fetch - duration: %v", cmd, time.Now().Sub(start))
 	return 0, nil
 }
 
-// ListEvents fetches events from InfluxDB filtered by parameters
+// ListEvents fetches events filtered by parameters
 func (s *StoreService) ListEvents(ctx context.Context, params hippo.Params) ([]*hippo.Event, error) {
 	start := time.Now()
 	var events []*hippo.Event
@@ -133,11 +117,11 @@ func (s *StoreService) ListEvents(ctx context.Context, params hippo.Params) ([]*
 				}
 				events = append(events, e)
 			}
-			log.Printf("%v --> %v events fetched - duration: %v", cmd, len(ser.Values), time.Now().Sub(start))
+			log.Printf("%s --> %d events fetched - duration: %v", cmd, len(ser.Values), time.Now().Sub(start))
 			return events, nil
 		}
 	}
 
-	log.Printf("%v --> no events to fetch - duration: %v", cmd, time.Now().Sub(start))
+	log.Printf("%s --> no events to fetch - duration: %v", cmd, time.Now().Sub(start))
 	return events, nil
 }

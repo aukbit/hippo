@@ -22,7 +22,7 @@ type Event struct {
 	Topic string
 	// Aggregate ID is the primary key of the aggregate to which the event refers to.
 	AggregateID string
-	// Version of the aggregate, useful when using concurrency writes.
+	// Version of the aggregate, useful when using concurrency writes. (read-only)
 	Version int64
 	// Schema of the aggregate.
 	Schema string
@@ -32,11 +32,12 @@ type Event struct {
 	Data []byte
 	// Priority of the event, where 0 is the highest priority.
 	Priority int32
-	// Signature includes SHA1 signature computed against it's contents and signature of the previous event.
+	// TODO: Signature includes SHA1 signature computed against it's contents and signature
+	// of the previous event. (not implemented yet)
 	Signature string
-	// Origin of the event. e.g. service name.
+	// TODO: Origin of the event. e.g. service name. (not implemented yet)
 	OriginName string
-	// Origin of the event. e.g. service ip address / browser.
+	// TODO: Origin of the event. e.g. service ip address / browser. (not implemented yet)
 	OriginIP string
 	// Metadata
 	Metadata map[string]string
@@ -50,6 +51,7 @@ func NewEvent(topic, aggregateID string, metadata map[string]string) *Event {
 		Topic:       topic,
 		AggregateID: aggregateID,
 		Metadata:    metadata,
+		CreateTime:  time.Now().UTC(),
 	}
 }
 
@@ -82,7 +84,7 @@ func (e *Event) UnmarshalProto(pb proto.Message) error {
 	return nil
 }
 
-// SetVersion set event version
+// SetVersion assign event version
 func (e *Event) SetVersion(version int64) {
 	e.Version = version
 }
