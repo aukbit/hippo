@@ -77,9 +77,9 @@ func (s *StoreService) CreateEvent(ctx context.Context, e *hippo.Event) error {
 
 	// NOTE: on migration events already bring timestamp otherwise timestamp
 	// should be set here
-	// if e.CreateTime == nil {
-	// 	e.CreateTime = ptypes.TimestampNow()
-	// }
+	if e.CreateTime.IsZero() {
+		e.CreateTime = time.Now()
+	}
 
 	// Create a new batch points
 	bp, err := s.client.BatchPoints()
