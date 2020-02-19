@@ -20,44 +20,6 @@ type StoreService struct {
 	client *Client
 }
 
-// Dispatch ...
-func (s *StoreService) Dispatch(ctx context.Context, msg hippo.Message, rules hippo.DomainRulesFn,
-	hooks ...hippo.HookFn) (*hippo.Store, error) {
-
-	// Fetch events from InfluxDB
-	events, err := s.ListEvents(ctx, hippo.Params{ID: msg.ID})
-	if err != nil {
-		return nil, err
-	}
-
-	// Create new Hippo store
-	store := &hippo.Store{}
-
-	// Load events into the store
-	if err := store.Load(events, rules); err != nil {
-		return nil, err
-	}
-
-	// Run hooks
-	for _, h := range hooks {
-		if err := h(store); err != nil {
-			return nil, err
-		}
-	}
-
-	// Persist event into InfluxDB
-	if err := s.CreateEvent(ctx, msg.Event); err != nil {
-		return nil, err
-	}
-
-	// Apply last event to the aggregator store
-	if err := store.Apply(msg.Event, rules); err != nil {
-		return nil, err
-	}
-
-	return store, nil
-}
-
 // CreateEvent ..
 func (s *StoreService) CreateEvent(ctx context.Context, e *hippo.Event) error {
 	start := time.Now()
@@ -166,7 +128,7 @@ func (s *StoreService) ListEvents(ctx context.Context, params hippo.Params) ([]*
 		for _, ser := range res.Series {
 			for _, val := range ser.Values {
 				e := &hippo.Event{}
-				if err := internal.UnmarshalEvent(val[1].([]byte), e); err != nil {
+				if err := internal.UnmarshalEventText(val[1].(string), e); err != nil {
 					return nil, err
 				}
 				events = append(events, e)
@@ -178,4 +140,42 @@ func (s *StoreService) ListEvents(ctx context.Context, params hippo.Params) ([]*
 
 	log.Printf("%v --> no events to fetch - duration: %v", cmd, time.Now().Sub(start))
 	return events, nil
+}
+
+// Dispatch ...
+func (s *StoreService) Dispatch(ctx context.Context, msg hippo.Message, rules hippo.DomainRulesFn,
+	hooks ...hippo.HookFn) (*hippo.Store, error) {
+
+	// Fetch events from InfluxDB
+	events, err := s.ListEvents(ctx, hippo.Params{ID: msg.ID})
+	if err != nil {
+		return nil, err
+	}
+
+	// Create new Hippo store
+	store := &hippo.Store{}
+
+	// Load events into the store
+	if err := store.Load(events, rules); err != nil {
+		return nil, err
+	}
+
+	// Run hooks
+	for _, h := range hooks {
+		if err := h(store); err != nil {
+			return nil, err
+		}
+	}
+
+	// Persist event into InfluxDB
+	if err := s.CreateEvent(ctx, msg.Event); err != nil {
+		return nil, err
+	}
+
+	// Apply last event to the aggregator store
+	if err := store.Apply(msg.Event, rules); err != nil {
+		return nil, err
+	}
+
+	return store, nil
 }
