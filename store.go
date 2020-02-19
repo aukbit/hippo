@@ -6,9 +6,9 @@ import (
 
 // StoreService represents a service for managing an aggregate store.
 type StoreService interface {
-	Dispatch(ctx context.Context, msg Message, rules DomainRulesFn, hooks ...HookFn) (*Store, error)
 	CreateEvent(ctx context.Context, e *Event) error
 	ListEvents(ctx context.Context, p Params) ([]*Event, error)
+	Dispatch(ctx context.Context, msg Message, rules DomainRulesFn, hooks ...HookFn) (*Store, error)
 }
 
 // Message represents a ID and event to be dispatched
