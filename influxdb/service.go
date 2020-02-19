@@ -94,12 +94,12 @@ func (s *StoreService) CreateEvent(ctx context.Context, e *hippo.Event) error {
 	}
 
 	// Encode event
-	data, err := internal.MarshalEvent(e)
+	data, err := internal.MarshalEventText(e)
 	if err != nil {
 		return err
 	}
 	fields := map[string]interface{}{
-		"data":    data,
+		"data":    string(data),
 		"version": e.Version,
 	}
 	pt, err := s.client.NewPoint("events", tags, fields, e.CreateTime)

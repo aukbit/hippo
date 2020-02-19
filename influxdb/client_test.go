@@ -20,7 +20,7 @@ func NewClient() *Client {
 	return c
 }
 
-// MustConnectClient returns an new, open instance of Client.
+// MustConnectClient returns a new and available Client.
 func MustConnectClient() *Client {
 	c := NewClient()
 	if err := c.Connect(influxdb.Config{
