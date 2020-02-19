@@ -23,7 +23,7 @@ func NewClient() *Client {
 // MustConnectClient returns an new, open instance of Client.
 func MustConnectClient() *Client {
 	c := NewClient()
-	if err := c.Client.Connect(influxdb.Config{
+	if err := c.Connect(influxdb.Config{
 		Database: "hippodb_test",
 	}); err != nil {
 		panic(err)

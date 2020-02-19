@@ -73,10 +73,11 @@ func (c *Client) Connect(conf Config) error {
 	if conf.Database == "" {
 		conf.Database = "hippodb"
 	}
+	c.database = conf.Database
 
 	// Note: If you attempt to create a database that already exists,
 	// InfluxDB does nothing and does not return an error.
-	if _, err := c.db.Query(c.Query("create database")); err != nil {
+	if _, err := c.db.Query(c.Query(fmt.Sprintf("create database %s", c.database))); err != nil {
 		return err
 	}
 	return nil
