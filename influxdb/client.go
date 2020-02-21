@@ -1,6 +1,7 @@
 package influxdb
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"time"
@@ -9,10 +10,12 @@ import (
 	db "github.com/influxdata/influxdb1-client/v2"
 )
 
+var _ hippo.Client = &Client{}
+
 // Client represents a client to the underlying InfluxDB data store.
 type Client struct {
 	// Services
-	storeService StoreService
+	eventService EventService
 
 	// client to connect to InfluxDB
 	db db.Client
@@ -39,7 +42,7 @@ type Config struct {
 // NewClient creates a new client
 func NewClient() *Client {
 	c := &Client{}
-	c.storeService.client = c
+	c.eventService.client = c
 	return c
 }
 
@@ -113,5 +116,11 @@ func (c *Client) NewPoint(name string, tags map[string]string, fields map[string
 	return db.NewPoint(name, tags, fields, t...)
 }
 
-// StoreService returns the store service associated with the client.
-func (c *Client) StoreService() hippo.StoreService { return &c.storeService }
+// EventService returns the event service associated with the client.
+func (c *Client) EventService() hippo.EventService { return &c.eventService }
+
+// Dispatch ..
+func (c *Client) Dispatch(ctx context.Context, msg hippo.Message,
+	rules hippo.DomainRulesFn, hooks ...hippo.HookFn) (*hippo.Store, error) {
+	return hippo.Dispatch(ctx, c.EventService(), msg, rules, hooks...)
+}

@@ -1,11 +1,19 @@
 package hippo
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
 )
+
+// EventService represents a service for managing an aggregate store.
+type EventService interface {
+	Create(ctx context.Context, e *Event) error
+	GetLastVersion(ctx context.Context, aggregateID string) (int64, error)
+	List(ctx context.Context, p Params) ([]*Event, error)
+}
 
 // Format enumerator
 type Format int32

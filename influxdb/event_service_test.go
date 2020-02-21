@@ -10,7 +10,7 @@ import (
 )
 
 // Ensure event can be created.
-func TestStoreService_CreateEvent(t *testing.T) {
+func TestEventService_Create(t *testing.T) {
 	c := MustConnectClient()
 	defer c.Close()
 
@@ -30,13 +30,13 @@ func TestStoreService_CreateEvent(t *testing.T) {
 	ctx := context.Background()
 
 	// Create event in store.
-	if err := c.StoreService().CreateEvent(ctx, event); err != nil {
+	if err := c.EventService().Create(ctx, event); err != nil {
 		t.Fatal(err)
 	}
 
 }
 
-func TestStoreService_GetLastVersion(t *testing.T) {
+func TestEventService_GetLastVersion(t *testing.T) {
 	c := MustConnectClient()
 	defer c.Close()
 
@@ -56,12 +56,12 @@ func TestStoreService_GetLastVersion(t *testing.T) {
 	ctx := context.Background()
 
 	// Create event in store.
-	if err := c.StoreService().CreateEvent(ctx, event); err != nil {
+	if err := c.EventService().Create(ctx, event); err != nil {
 		t.Fatal(err)
 	}
 
 	// Get last event version from store.
-	if n, err := c.StoreService().GetLastVersion(ctx, user.GetId()); err != nil {
+	if n, err := c.EventService().GetLastVersion(ctx, user.GetId()); err != nil {
 		t.Fatal(err)
 	} else if n != 0 {
 		t.Fatalf("unexpected version: %#v != 0", n)
@@ -69,7 +69,7 @@ func TestStoreService_GetLastVersion(t *testing.T) {
 
 }
 
-func TestStoreService_ListEvents(t *testing.T) {
+func TestEventService_ListEvents(t *testing.T) {
 	c := MustConnectClient()
 	defer c.Close()
 
@@ -89,7 +89,7 @@ func TestStoreService_ListEvents(t *testing.T) {
 	ctx := context.Background()
 
 	// Create event 1 in store.
-	if err := c.StoreService().CreateEvent(ctx, ev1); err != nil {
+	if err := c.EventService().Create(ctx, ev1); err != nil {
 		t.Fatal(err)
 	}
 
@@ -105,7 +105,7 @@ func TestStoreService_ListEvents(t *testing.T) {
 	ev2.Version = 1
 
 	// Create event 2 in store.
-	if err := c.StoreService().CreateEvent(ctx, ev2); err != nil {
+	if err := c.EventService().Create(ctx, ev2); err != nil {
 		t.Fatal(err)
 	}
 
@@ -114,7 +114,7 @@ func TestStoreService_ListEvents(t *testing.T) {
 		ID: user.GetId(),
 	}
 	// List events
-	if events, err := c.StoreService().ListEvents(ctx, p); err != nil {
+	if events, err := c.EventService().List(ctx, p); err != nil {
 		t.Fatal(err)
 	} else if len(events) != 2 {
 		t.Fatalf("unexpected number of events: %#v != 2", len(events))

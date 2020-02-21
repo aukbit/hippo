@@ -11,17 +11,18 @@ import (
 	"github.com/aukbit/hippo/influxdb/internal"
 )
 
-// Ensure StoreService implements hippo.StoreService.
-var _ hippo.StoreService = &StoreService{}
+// Ensure EventService implements hippo.EventService.
+var _ hippo.EventService = &EventService{}
 
-// StoreService represents a service for managing an aggregate store
+// EventService represents a service for managing an aggregate store
 // with a InfluxDB client connected.
-type StoreService struct {
+type EventService struct {
+	// db client
 	client *Client
 }
 
-// CreateEvent persists the event.
-func (s *StoreService) CreateEvent(ctx context.Context, e *hippo.Event) error {
+// Create persists the event.
+func (s *EventService) Create(ctx context.Context, e *hippo.Event) error {
 	start := time.Now()
 
 	// Create a new batch points
@@ -61,7 +62,7 @@ func (s *StoreService) CreateEvent(ctx context.Context, e *hippo.Event) error {
 }
 
 // GetLastVersion fetches the last version for the aggregate
-func (s *StoreService) GetLastVersion(ctx context.Context, aggregateID string) (int64, error) {
+func (s *EventService) GetLastVersion(ctx context.Context, aggregateID string) (int64, error) {
 	start := time.Now()
 	cmd := fmt.Sprintf("select last(version) from events where aggregate_id='%s'", aggregateID)
 	response, err := s.client.db.Query(s.client.Query(cmd))
@@ -84,8 +85,8 @@ func (s *StoreService) GetLastVersion(ctx context.Context, aggregateID string) (
 	return 0, nil
 }
 
-// ListEvents fetches events filtered by parameters
-func (s *StoreService) ListEvents(ctx context.Context, params hippo.Params) ([]*hippo.Event, error) {
+// List fetches events filtered by parameters
+func (s *EventService) List(ctx context.Context, params hippo.Params) ([]*hippo.Event, error) {
 	start := time.Now()
 	var events []*hippo.Event
 
