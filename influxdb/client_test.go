@@ -24,7 +24,7 @@ func NewClient() *Client {
 func MustConnectClient() *Client {
 	c := NewClient()
 	if err := c.Connect(influxdb.Config{
-		Database: "hippodb_test",
+		Database: "hippo_db_test",
 	}); err != nil {
 		panic(err)
 	}

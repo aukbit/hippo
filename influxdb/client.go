@@ -71,7 +71,7 @@ func (c *Client) Connect(conf Config) error {
 	}
 
 	if conf.Database == "" {
-		conf.Database = "hippodb"
+		conf.Database = "hippo_db"
 	}
 	c.database = conf.Database
 
