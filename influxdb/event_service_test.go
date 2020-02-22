@@ -11,7 +11,7 @@ import (
 
 // Ensure event can be created.
 func TestEventService_Create(t *testing.T) {
-	c := MustConnectClient()
+	c := MustConnectStore()
 	defer c.Close()
 
 	user := pb.User{
@@ -37,7 +37,7 @@ func TestEventService_Create(t *testing.T) {
 }
 
 func TestEventService_GetLastVersion(t *testing.T) {
-	c := MustConnectClient()
+	c := MustConnectStore()
 	defer c.Close()
 
 	user := pb.User{
@@ -70,7 +70,7 @@ func TestEventService_GetLastVersion(t *testing.T) {
 }
 
 func TestEventService_ListEvents(t *testing.T) {
-	c := MustConnectClient()
+	c := MustConnectStore()
 	defer c.Close()
 
 	user := pb.User{

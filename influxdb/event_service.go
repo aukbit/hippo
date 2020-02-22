@@ -18,7 +18,7 @@ var _ hippo.EventService = &EventService{}
 // with a InfluxDB client connected.
 type EventService struct {
 	// db client
-	client *Client
+	store *StoreService
 }
 
 // Create persists the event.
@@ -26,7 +26,7 @@ func (s *EventService) Create(ctx context.Context, e *hippo.Event) error {
 	start := time.Now()
 
 	// Create a new batch points
-	bp, err := s.client.BatchPoints()
+	bp, err := s.store.BatchPoints()
 	if err != nil {
 		return err
 	}
@@ -46,14 +46,14 @@ func (s *EventService) Create(ctx context.Context, e *hippo.Event) error {
 		"data":    string(data),
 		"version": e.Version,
 	}
-	pt, err := s.client.NewPoint("events", tags, fields, e.CreateTime)
+	pt, err := s.store.NewPoint("events", tags, fields, e.CreateTime)
 	if err != nil {
 		return err
 	}
 	bp.AddPoint(pt)
 
 	// Write the batch
-	if err := s.client.db.Write(bp); err != nil {
+	if err := s.store.db.Write(bp); err != nil {
 		return err
 	}
 
@@ -65,7 +65,7 @@ func (s *EventService) Create(ctx context.Context, e *hippo.Event) error {
 func (s *EventService) GetLastVersion(ctx context.Context, aggregateID string) (int64, error) {
 	start := time.Now()
 	cmd := fmt.Sprintf("select last(version) from events where aggregate_id='%s'", aggregateID)
-	response, err := s.client.db.Query(s.client.Query(cmd))
+	response, err := s.store.db.Query(s.store.Query(cmd))
 	if err != nil {
 		return 0, err
 	}
@@ -102,7 +102,7 @@ func (s *EventService) List(ctx context.Context, params hippo.Params) ([]*hippo.
 	} else {
 		cmd = fmt.Sprintf("select data from events where aggregate_id='%s'", params.ID)
 	}
-	response, err := s.client.db.Query(s.client.Query(cmd))
+	response, err := s.store.db.Query(s.store.Query(cmd))
 	if err != nil {
 		return nil, err
 	}

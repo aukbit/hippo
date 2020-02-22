@@ -1,4 +1,4 @@
-package influxdb_test
+package hippo_test
 
 import (
 	"context"
@@ -6,45 +6,12 @@ import (
 	"testing"
 
 	"github.com/aukbit/hippo"
-	"github.com/aukbit/hippo/influxdb"
+	"github.com/aukbit/hippo/mock"
 	pb "github.com/aukbit/hippo/test/proto"
 	"github.com/aukbit/rand"
 )
 
-// Client is a test wrapper for influxdb.Client.
-type Client struct {
-	*influxdb.Client
-}
-
-// NewClient returns a new instance of Client
-func NewClient() *Client {
-
-	// Create client wrapper.
-	c := &Client{
-		Client: influxdb.NewClient(),
-	}
-	return c
-}
-
-// MustConnectClient returns a new and available Client.
-func MustConnectClient() *Client {
-	c := NewClient()
-	if err := c.Connect(influxdb.Config{
-		Database: "hippo_db_test",
-	}); err != nil {
-		panic(err)
-	}
-	return c
-}
-
-// Close closes the client and removes the underlying database.
-func (c *Client) Close() error {
-	return c.Client.Close()
-}
-
-func TestClient_Dispatch(t *testing.T) {
-	c := MustConnectClient()
-	defer c.Close()
+func TestStore_Dispatch(t *testing.T) {
 
 	user := pb.User{
 		Id:    rand.String(10),
@@ -59,12 +26,37 @@ func TestClient_Dispatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ctx := context.Background()
-
 	msg := hippo.Message{
 		ID:    user.GetId(),
 		Event: ev1,
 	}
+
+	var ss mock.StoreService
+	var es mock.EventService
+
+	// Mock our EventService() call.
+	ss.EventServiceFn = func() *mock.EventService {
+		return &es
+	}
+
+	// Mock our List()
+	es.ListFn = func(ctx context.Context, p hippo.Params) ([]*hippo.Event, error) {
+		return []*hippo.Event{ev1}, nil
+	}
+
+	// Mock our GetLastVersion()
+	es.GetLastVersionFn = func(ctx context.Context, aggregateID string) (int64, error) {
+		return 0, nil
+	}
+
+	// Mock our GetLastVersion()
+	es.CreateFn = func(ctx context.Context, e *hippo.Event) error {
+		return nil
+	}
+
+	clt := hippo.NewClient(&ss)
+
+	ctx := context.Background()
 
 	rules := func(e *hippo.Event, state interface{}) (interface{}, error) {
 		n := pb.User{}
@@ -79,12 +71,19 @@ func TestClient_Dispatch(t *testing.T) {
 		case "user_created":
 			return &n, nil
 		}
-		return state, nil
 	}
 
 	// Create event 1 in store.
-	if store, err := c.Dispatch(ctx, msg, rules); err != nil {
+	if store, err := clt.Dispatch(ctx, msg, rules); err != nil {
 		t.Fatal(err)
+	} else if !ss.EventServiceInvoked {
+		t.Fatal("expected EventService() to be invoked")
+	} else if !es.CreateInvoked {
+		t.Fatal("expected Create() to be invoked")
+	} else if !es.GetLastVersionInvoked {
+		t.Fatal("expected GetLastVersion() to be invoked")
+	} else if !es.ListInvoked {
+		t.Fatal("expected List() to be invoked")
 	} else if _, ok := store.State.(*pb.User); !ok {
 		t.Fatalf("unexpected store state type: %T ", store.State)
 	} else if store.Version != 1 {

@@ -10,7 +10,7 @@ import (
 	"github.com/aukbit/rand"
 )
 
-func helloHandler(clt hippo.Client) http.Handler {
+func helloHandler(clt *hippo.Client) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		user := pb.User{
@@ -45,7 +45,6 @@ func helloHandler(clt hippo.Client) http.Handler {
 			case "user_created":
 				return &n, nil
 			}
-			return state, nil
 		}
 
 		store, err := clt.Dispatch(r.Context(), msg, rules)
@@ -62,14 +61,16 @@ func helloHandler(clt hippo.Client) http.Handler {
 
 func main() {
 	// Open our database connection.
-	c := influxdb.NewClient()
-	if err := c.Connect(influxdb.Config{
+	store := influxdb.NewStoreService()
+	if err := store.Connect(influxdb.Config{
 		Database: "hippo_example_db",
 	}); err != nil {
 		panic(err)
 	}
 
+	client := hippo.NewClient(store)
+
 	// Register our handler.
-	http.Handle("/hello", helloHandler(c))
-	http.ListenAndServe(":8080", nil)
+	http.Handle("/hello", helloHandler(client))
+	http.ListenAndServe(":8082", nil)
 }
