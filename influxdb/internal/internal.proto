@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package internal;
+
+option go_package = "github.com/aukbit/hippo/influxdb/internal";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+// A simple Eventstore API.
+// 
+// Command service definition.
+service Command {
+    rpc CreateEvent (CreateEventRequest) returns (google.protobuf.Empty) {}
+    rpc SnapshotEvent (SnapshotEventRequest) returns (google.protobuf.Empty) {}
+}
+
+// Query service definition.
+service Query {
+    rpc GetEvent (GetEventRequest) returns (Event) {}
+    rpc ListEvents (ListEventsRequest) returns (stream Event) {}
+}
+
+// Event resource.
+message Event {
+    // Topic (name) of the event. These should be written in the past tense (event_created)
+    string topic = 1;
+    // Aggregate ID is the primary key of the aggregate to which the event refers to.
+    string aggregate_id = 2;
+    // Version of the aggregate, useful when using concurrency writes.
+    int64 version = 3;
+    // Schema of the aggregate.
+    string schema = 4;
+    // Format of the encoded type of the aggregate data
+    Format format = 5;
+    // Data raw object data.
+    bytes data  = 6;
+    // Priority of the event, where 0 is the highest priority.
+    int32 priority = 7;
+    // Signature includes SHA1 signature computed against it's contents and signature of the previous event.
+    string signature = 8;
+    // Origin of the event. e.g. service name.
+    string origin_name = 9;
+    // Origin of the event. e.g. service ip address / browser.
+    string origin_ip = 10;
+    // Metadata
+    map<string, string> metadata = 11;
+    // CreateTime timestamp when event ocurred, location should be set to UTC.
+    google.protobuf.Timestamp create_time = 12;
+    // ...
+}
+
+// Format enumerator
+enum Format {
+    PROTOBUF = 0;
+    JSON = 1;
+    STRING = 2;
+}
+
+// Request message for CreateEvent method.
+message CreateEventRequest {
+    // The event resource to create.
+    Event event = 1;
+}
+
+// Request message for SnapshotEvent method.
+message SnapshotEventRequest {
+    // The event resource to snapshot.
+    Event event = 1;
+}
+
+// Request message for GetEvent method.
+message GetEventRequest {
+    // The ID of the event is based on the aggregate_id and version
+    string aggregate_id = 1;
+    int64 version = 2;
+}
+
+// Request message for ListEvents method.
+message ListEventsRequest {
+    // The ID of the event is based on the aggregate_id and version
+    string aggregate_id = 1;
+    int64 version_min = 2;
+    int64 version_max = 3;
+}
