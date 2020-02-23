@@ -1,0 +1,20 @@
+Version 0.1.0
+ - ignore version script
+ - refactor naming and mock hippo services
+ - draft example
+ - rename default db names
+ - do optimistic concurrency in dispatch func
+ - add dispatch func to hippo package
+ - test service list events
+ - fix service test
+ - test event data can be marshaled
+ - test internal package
+ - fix client database assignement
+ - test package influxdb
+ - check if time is zero
+ - draft all store service methods
+ - add influxdb client methods
+ - draft influxdb package
+ - draft hippo structure
+ - Initial commit
+
