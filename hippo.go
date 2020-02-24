@@ -7,6 +7,12 @@ type StoreService interface {
 	EventService() EventService
 }
 
+// CacheService represents a service for managing cache.
+type CacheService interface {
+	Get(ctx context.Context, aggregateID string) (*Aggregate, error)
+	Set(ctx context.Context, agg *Aggregate) error
+}
+
 // Message represents ID and event to be dispatched
 type Message struct {
 	ID    string
@@ -66,6 +72,7 @@ func (a *Aggregate) apply(e *Event, fn DomainRulesFn) error {
 // Client to hold store service implementation
 type Client struct {
 	store StoreService
+	cache CacheService
 }
 
 // NewClient return client struct
@@ -75,21 +82,18 @@ func NewClient(s StoreService) *Client {
 	}
 }
 
+// SetCacheService assigns a cache service to the client store
+func (c *Client) SetCacheService(cache CacheService) {
+	c.cache = cache
+}
+
 // Dispatch returns an aggregate based on a event message and domain rules
 func (c *Client) Dispatch(ctx context.Context, msg Message,
 	rules DomainRulesFn, hooks ...HookFn) (*Aggregate, error) {
 
-	// Fetch events from datastore
-	events, err := c.store.EventService().List(ctx, Params{ID: msg.ID})
+	// Fetch aggregate.
+	agg, err := c.fetch(ctx, msg.ID, rules)
 	if err != nil {
-		return nil, err
-	}
-
-	// Create new aggregate
-	agg := &Aggregate{}
-
-	// Load events into the aggregate
-	if err := agg.load(events, rules); err != nil {
 		return nil, err
 	}
 
@@ -100,17 +104,6 @@ func (c *Client) Dispatch(ctx context.Context, msg Message,
 		}
 	}
 
-	// Do an optimistic concurrency test on the data coming in,
-	// if the expected version does not match the actual aggregate version
-	// it will raise a concurrency exception
-	v, err := c.store.EventService().GetLastVersion(ctx, msg.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	if agg.Version != v {
-		return nil, ErrConcurrencyException
-	}
 	// Increment version by one and assign it to the new event
 	msg.Event.SetVersion(agg.Version + 1)
 
@@ -122,6 +115,55 @@ func (c *Client) Dispatch(ctx context.Context, msg Message,
 	// Apply last event to the aggregator store
 	if err := agg.apply(msg.Event, rules); err != nil {
 		return nil, err
+	}
+
+	// If CacheService is defined store aggregate in cache.
+	if c.cache != nil {
+		if err := c.cache.Set(ctx, agg); err != nil {
+			return nil, err
+		}
+	}
+
+	return agg, nil
+}
+
+func (c *Client) fetch(ctx context.Context, aggregateID string, rules DomainRulesFn) (*Aggregate, error) {
+
+	// Get last aggregate version to do a optimistic concurrency test
+	// on the data coming in.
+	v, err := c.store.EventService().GetLastVersion(ctx, aggregateID)
+	if err != nil {
+		return nil, err
+	}
+
+	// If CacheService is defined check in Cache first.
+	if c.cache != nil {
+		if agg, _ := c.cache.Get(ctx, aggregateID); agg != nil {
+			// Check if version from cache is the version expected.
+			if agg.Version == v {
+				return agg, nil
+			}
+		}
+	}
+
+	// Create new aggregate
+	agg := &Aggregate{}
+
+	// Fetch events from datastore
+	events, err := c.store.EventService().List(ctx, Params{ID: aggregateID})
+	if err != nil {
+		return nil, err
+	}
+
+	// Load events into the aggregate
+	if err := agg.load(events, rules); err != nil {
+		return nil, err
+	}
+
+	// If the expected version does not match the actual aggregate version
+	// it will raise a concurrency exception
+	if agg.Version != v {
+		return nil, ErrConcurrencyException
 	}
 
 	return agg, nil

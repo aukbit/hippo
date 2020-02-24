@@ -39,3 +39,20 @@ func (s *StoreService) EventService() hippo.EventService {
 	s.EventServiceInvoked = true
 	return s.EventServiceFn()
 }
+
+type CacheService struct {
+	GetFn      func(ctx context.Context, aggregateID string) (*hippo.Aggregate, error)
+	GetInvoked bool
+	SetFn      func(ctx context.Context, agg *hippo.Aggregate) error
+	SetInvoked bool
+}
+
+func (s *CacheService) Get(ctx context.Context, aggregateID string) (*hippo.Aggregate, error) {
+	s.GetInvoked = true
+	return s.GetFn(ctx, aggregateID)
+}
+
+func (s *CacheService) Set(ctx context.Context, agg *hippo.Aggregate) error {
+	s.SetInvoked = true
+	return s.SetFn(ctx, agg)
+}
