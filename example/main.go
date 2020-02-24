@@ -32,22 +32,24 @@ func helloHandler(clt *hippo.Client) http.Handler {
 			Event: ev1,
 		}
 
-		rules := func(e *hippo.Event, state interface{}) (interface{}, error) {
-			n := pb.User{}
-			if e.Schema == fmt.Sprintf("%T", &pb.User{}) {
-				if err := e.UnmarshalProto(&n); err != nil {
-					return nil, err
+		rules := func(e *hippo.Event, currentState, nextState hippo.Data) error {
+			if e.Schema == fmt.Sprintf("%T", nextState) {
+				if err := e.UnmarshalProto(nextState); err != nil {
+					return err
 				}
 			}
 			switch e.Topic {
 			default:
-				return state, nil
+				nextState = currentState
 			case "user_created":
-				return &n, nil
+				return nil
 			}
+			return nil
 		}
 
-		store, err := clt.Dispatch(r.Context(), msg, rules)
+		domain := hippo.Domain{NextState: &pb.User{}, Rules: rules}
+
+		store, err := clt.Dispatch(r.Context(), msg, domain)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return

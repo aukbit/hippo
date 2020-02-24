@@ -58,23 +58,27 @@ func TestStore_Dispatch(t *testing.T) {
 
 	ctx := context.Background()
 
-	rules := func(e *hippo.Event, state interface{}) (interface{}, error) {
-		n := pb.User{}
-		if e.Schema == fmt.Sprintf("%T", &pb.User{}) {
-			if err := e.UnmarshalProto(&n); err != nil {
-				return nil, err
+	rules := func(e *hippo.Event, currentState, nextState hippo.Data) error {
+		if e.Schema == fmt.Sprintf("%T", nextState) {
+			if err := e.UnmarshalProto(nextState); err != nil {
+				return err
 			}
 		}
+
 		switch e.Topic {
 		default:
-			return state, nil
+			nextState = currentState
 		case "user_created":
-			return &n, nil
+			return nil
 		}
+		return nil
 	}
 
+	var next pb.User
+	domain := hippo.Domain{NextState: &next, Rules: rules}
+
 	// Create event 1 in store.
-	if store, err := clt.Dispatch(ctx, msg, rules); err != nil {
+	if store, err := clt.Dispatch(ctx, msg, domain); err != nil {
 		t.Fatal(err)
 	} else if !ss.EventServiceInvoked {
 		t.Fatal("expected EventService() to be invoked")
@@ -132,14 +136,11 @@ func TestStoreWithCache_Dispatch(t *testing.T) {
 	}
 
 	// Mock CacheService.Get() call.
-	cs.GetFn = func(ctx context.Context, aggregateID string) (*hippo.Aggregate, error) {
-		return &hippo.Aggregate{
-			State:   user,
-			Version: 0,
-		}, nil
+	cs.GetFn = func(ctx context.Context, aggregateID string, out *hippo.Aggregate) error {
+		return nil
 	}
 
-	cs.SetFn = func(ctx context.Context, agg *hippo.Aggregate) error {
+	cs.SetFn = func(ctx context.Context, aggregateID string, in *hippo.Aggregate) error {
 		return nil
 	}
 
@@ -150,23 +151,26 @@ func TestStoreWithCache_Dispatch(t *testing.T) {
 
 	ctx := context.Background()
 
-	rules := func(e *hippo.Event, state interface{}) (interface{}, error) {
-		n := pb.User{}
-		if e.Schema == fmt.Sprintf("%T", &pb.User{}) {
-			if err := e.UnmarshalProto(&n); err != nil {
-				return nil, err
+	rules := func(e *hippo.Event, currentState, nextState hippo.Data) error {
+		if e.Schema == fmt.Sprintf("%T", nextState) {
+			if err := e.UnmarshalProto(nextState); err != nil {
+				return err
 			}
 		}
+
 		switch e.Topic {
 		default:
-			return state, nil
+			nextState = currentState
 		case "user_created":
-			return &n, nil
+			return nil
 		}
+		return nil
 	}
 
+	domain := hippo.Domain{NextState: &pb.User{}, Rules: rules}
+
 	// Create event 1 in store.
-	if store, err := clt.Dispatch(ctx, msg, rules); err != nil {
+	if store, err := clt.Dispatch(ctx, msg, domain); err != nil {
 		t.Fatal(err)
 	} else if !ss.EventServiceInvoked {
 		t.Fatal("expected EventService() to be invoked")

@@ -1,6 +1,8 @@
 package hippo
 
-import "context"
+import (
+	"context"
+)
 
 // StoreService represents a service for managing an aggregate store.
 type StoreService interface {
@@ -9,8 +11,8 @@ type StoreService interface {
 
 // CacheService represents a service for managing cache.
 type CacheService interface {
-	Get(ctx context.Context, aggregateID string) (*Aggregate, error)
-	Set(ctx context.Context, agg *Aggregate) error
+	Get(ctx context.Context, aggregateID string, out *Aggregate) error
+	Set(ctx context.Context, aggregateID string, in *Aggregate) error
 }
 
 // Message represents ID and event to be dispatched
@@ -33,21 +35,35 @@ type Params struct {
 // Please note that the new event is not yet dispatched / persisted when the HookFn is called.
 type HookFn func(*Aggregate) error
 
+// Domain ..
+type Domain struct {
+	NextState Data
+	Rules     DomainRulesFn
+}
+
 // DomainRulesFn represents a function type for domain rules. Domain rules define the ways
 // the state of a specific aggregate change for a determine event.
-type DomainRulesFn func(e *Event, state interface{}) (interface{}, error)
+type DomainRulesFn func(e *Event, currentState, nextState Data) error
+
+// Data is a replica of proto.Message which is implemented by generated protocol buffer messages.
+// We find using protocol buffers quite useful to marshal and unmarshal objects
+type Data interface {
+	Reset()
+	String() string
+	ProtoMessage()
+}
 
 // Aggregate represents an aggregator state and respective version
 type Aggregate struct {
-	State   interface{}
+	State   Data
 	Version int64
 }
 
 // load takes a list of events and apply them to the aggregate
-func (a *Aggregate) load(events []*Event, rules DomainRulesFn) error {
+func (a *Aggregate) load(events []*Event, domain Domain) error {
 
 	for _, e := range events {
-		if err := a.apply(e, rules); err != nil {
+		if err := a.apply(e, domain); err != nil {
 			return err
 		}
 	}
@@ -57,13 +73,12 @@ func (a *Aggregate) load(events []*Event, rules DomainRulesFn) error {
 
 // apply applies changes to the current state based on the domain rules defined for the
 // respective event topic
-func (a *Aggregate) apply(e *Event, fn DomainRulesFn) error {
-	n, err := fn(e, a.State)
-	if err != nil {
+func (a *Aggregate) apply(e *Event, domain Domain) error {
+	if err := domain.Rules(e, a.State, domain.NextState); err != nil {
 		return err
 	}
 	// set changes to the state
-	a.State = n
+	a.State = domain.NextState
 	// set state version the same as the aggregator
 	a.Version = e.Version
 	return nil
@@ -88,11 +103,10 @@ func (c *Client) SetCacheService(cache CacheService) {
 }
 
 // Dispatch returns an aggregate based on a event message and domain rules
-func (c *Client) Dispatch(ctx context.Context, msg Message,
-	rules DomainRulesFn, hooks ...HookFn) (*Aggregate, error) {
+func (c *Client) Dispatch(ctx context.Context, msg Message, domain Domain, hooks ...HookFn) (*Aggregate, error) {
 
 	// Fetch aggregate.
-	agg, err := c.fetch(ctx, msg.ID, rules)
+	agg, err := c.fetch(ctx, msg, domain)
 	if err != nil {
 		return nil, err
 	}
@@ -113,13 +127,13 @@ func (c *Client) Dispatch(ctx context.Context, msg Message,
 	}
 
 	// Apply last event to the aggregator store
-	if err := agg.apply(msg.Event, rules); err != nil {
+	if err := agg.apply(msg.Event, domain); err != nil {
 		return nil, err
 	}
 
 	// If CacheService is defined store aggregate in cache.
 	if c.cache != nil {
-		if err := c.cache.Set(ctx, agg); err != nil {
+		if err := c.cache.Set(ctx, msg.ID, agg); err != nil {
 			return nil, err
 		}
 	}
@@ -127,19 +141,22 @@ func (c *Client) Dispatch(ctx context.Context, msg Message,
 	return agg, nil
 }
 
-func (c *Client) fetch(ctx context.Context, aggregateID string, rules DomainRulesFn) (*Aggregate, error) {
+func (c *Client) fetch(ctx context.Context, msg Message, domain Domain) (*Aggregate, error) {
 
 	// Get last aggregate version to do a optimistic concurrency test
 	// on the data coming in.
-	v, err := c.store.EventService().GetLastVersion(ctx, aggregateID)
+	v, err := c.store.EventService().GetLastVersion(ctx, msg.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	// If CacheService is defined check in Cache first.
 	if c.cache != nil {
-		if agg, _ := c.cache.Get(ctx, aggregateID); agg != nil {
-			// Check if version from cache is the version expected.
+		agg := &Aggregate{
+			State: domain.NextState,
+		}
+		if err := c.cache.Get(ctx, msg.ID, agg); err == nil {
+			// Check if verssion from cache is the version expected.
 			if agg.Version == v {
 				return agg, nil
 			}
@@ -150,13 +167,13 @@ func (c *Client) fetch(ctx context.Context, aggregateID string, rules DomainRule
 	agg := &Aggregate{}
 
 	// Fetch events from datastore
-	events, err := c.store.EventService().List(ctx, Params{ID: aggregateID})
+	events, err := c.store.EventService().List(ctx, Params{ID: msg.ID})
 	if err != nil {
 		return nil, err
 	}
 
 	// Load events into the aggregate
-	if err := agg.load(events, rules); err != nil {
+	if err := agg.load(events, domain); err != nil {
 		return nil, err
 	}
 

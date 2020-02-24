@@ -11,6 +11,13 @@ const (
 	ErrEventFormatIsInvalid = Error("event data is not encoded in the right format")
 )
 
+// Cache errors.
+const (
+	ErrKeyDoesNotExist          = Error("key does not exist")
+	ErrVersionFieldDoesNotExist = Error("invalid aggregate key - version field does not exist")
+	ErrStateFieldDoesNotExist   = Error("invalid aggregate key - state field does not exist")
+)
+
 // Error represents a HIPPO error.
 type Error string
 
