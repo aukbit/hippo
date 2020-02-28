@@ -2,6 +2,9 @@ package hippo
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/golang/protobuf/proto"
 )
 
 // StoreService represents a service for managing an aggregate store.
@@ -37,13 +40,13 @@ type HookFn func(*Aggregate) error
 
 // Domain ..
 type Domain struct {
-	NextState Data
-	Rules     DomainRulesFn
+	Output interface{}
+	Rules  DomainRulesFn
 }
 
-// DomainRulesFn represents a function type for domain rules. Domain rules define the ways
-// the state of a specific aggregate change for a determine event.
-type DomainRulesFn func(e *Event, currentState, nextState Data) error
+// DomainRulesFn represents a function type for domain rules.
+// Domain rules define how the new data received changes the aggregate state.
+type DomainRulesFn func(topic string, old, new interface{}) (next interface{})
 
 // Data is a replica of proto.Message which is implemented by generated protocol buffer messages.
 // We find using protocol buffers quite useful to marshal and unmarshal objects
@@ -55,7 +58,7 @@ type Data interface {
 
 // Aggregate represents an aggregator state and respective version
 type Aggregate struct {
-	State   Data
+	State   interface{}
 	Version int64
 }
 
@@ -74,11 +77,25 @@ func (a *Aggregate) load(events []*Event, domain Domain) error {
 // apply applies changes to the current state based on the domain rules defined for the
 // respective event topic
 func (a *Aggregate) apply(e *Event, domain Domain) error {
-	if err := domain.Rules(e, a.State, domain.NextState); err != nil {
-		return err
+
+	switch e.Format {
+	case PROTOBUF:
+		if e.Schema != fmt.Sprintf("%T", domain.Output) {
+			return ErrSchemaProvidedIsInvalid
+		}
+		if err := e.UnmarshalProto(domain.Output.(proto.Message)); err != nil {
+			return err
+		}
+	case JSON:
+		// TODO
+		return ErrNotImplemented
+	case STRING:
+		// TODO
+		return ErrNotImplemented
 	}
-	// set changes to the state
-	a.State = domain.NextState
+
+	// run rules for the event topic and update aggregate state accordingly
+	a.State = domain.Rules(e.Topic, a.State, domain.Output)
 	// set state version the same as the aggregator
 	a.Version = e.Version
 	return nil
@@ -153,7 +170,7 @@ func (c *Client) fetch(ctx context.Context, msg Message, domain Domain) (*Aggreg
 	// If CacheService is defined check in Cache first.
 	if c.cache != nil {
 		agg := &Aggregate{
-			State: domain.NextState,
+			State: domain.Output,
 		}
 		if err := c.cache.Get(ctx, msg.ID, agg); err == nil {
 			// Check if verssion from cache is the version expected.

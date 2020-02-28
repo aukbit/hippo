@@ -53,8 +53,17 @@ type Event struct {
 	CreateTime time.Time
 }
 
-// NewEvent intantiates hippo event
-func NewEvent(topic, aggregateID string, metadata map[string]string) *Event {
+// NewEvent returns an event resource.
+func NewEvent(topic, aggregateID string) *Event {
+	return &Event{
+		Topic:       topic,
+		AggregateID: aggregateID,
+		CreateTime:  time.Now().UTC(),
+	}
+}
+
+// NewEventWithMetadata returns an event resource.
+func NewEventWithMetadata(topic, aggregateID string, metadata map[string]string) *Event {
 	return &Event{
 		Topic:       topic,
 		AggregateID: aggregateID,

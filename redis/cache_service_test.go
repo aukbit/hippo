@@ -8,6 +8,7 @@ import (
 	"github.com/aukbit/hippo/redis"
 	pb "github.com/aukbit/hippo/test/proto"
 	"github.com/aukbit/rand"
+	"github.com/paulormart/assert"
 )
 
 // Cache is a test wrapper for redis.CacheService.
@@ -52,7 +53,7 @@ func TestCacheService_Set(t *testing.T) {
 		Email: "test@email.com",
 	}
 
-	agg := &hippo.Aggregate{
+	in := &hippo.Aggregate{
 		State:   user,
 		Version: 1,
 	}
@@ -60,7 +61,7 @@ func TestCacheService_Set(t *testing.T) {
 	ctx := context.Background()
 
 	// Set aggregator in cache.
-	if err := c.Set(ctx, user.GetId(), agg); err != nil {
+	if err := c.Set(ctx, user.GetId(), in); err != nil {
 		t.Fatal(err)
 	}
 
@@ -76,7 +77,7 @@ func TestCacheService_Get(t *testing.T) {
 		Email: "test@email.com",
 	}
 
-	agg := &hippo.Aggregate{
+	in := &hippo.Aggregate{
 		State:   user,
 		Version: 1,
 	}
@@ -84,14 +85,23 @@ func TestCacheService_Get(t *testing.T) {
 	ctx := context.Background()
 
 	// Set aggregator in cache.
-	if err := c.Set(ctx, user.GetId(), agg); err != nil {
+	if err := c.Set(ctx, user.GetId(), in); err != nil {
 		t.Fatal(err)
 	}
 
-	next := &hippo.Aggregate{}
+	out := &hippo.Aggregate{
+		State: &pb.User{},
+	}
+
 	// Get aggregator from cache.
-	if err := c.Get(ctx, user.GetId(), next); err != nil {
+	if err := c.Get(ctx, user.GetId(), out); err != nil {
 		t.Fatal(err)
 	}
+
+	assert.Equal(t, user.GetId(), out.State.(*pb.User).GetId())
+	assert.Equal(t, user.GetName(), out.State.(*pb.User).GetName())
+	assert.Equal(t, user.GetEmail(), out.State.(*pb.User).GetEmail())
+	assert.Equal(t, int64(1), out.Version)
+	assert.Equal(t, in, out)
 
 }

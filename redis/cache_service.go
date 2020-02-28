@@ -96,7 +96,7 @@ func (s *CacheService) Get(ctx context.Context, aggregateID string, out *hippo.A
 		return hippo.ErrStateFieldDoesNotExist
 	} else if s != "" {
 		// Decodes data string into a proto message
-		if err := proto.UnmarshalText(s, out.State); err != nil {
+		if err := proto.UnmarshalText(s, out.State.(proto.Message)); err != nil {
 			return err
 		}
 	}
@@ -112,7 +112,7 @@ func (s *CacheService) Set(ctx context.Context, aggregateID string, in *hippo.Ag
 	fields := make(map[string]interface{})
 	fields["version"] = strconv.FormatInt(in.Version, 10)
 	fields["schema"] = fmt.Sprintf("%T", in.State)
-	fields["state"] = proto.CompactTextString(in.State)
+	fields["state"] = proto.CompactTextString(in.State.(proto.Message))
 
 	if cmd := s.db.HMSet(aggregateID, fields); cmd.Err() != nil {
 		return cmd.Err()
