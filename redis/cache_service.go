@@ -107,8 +107,6 @@ func (s *CacheService) Get(ctx context.Context, aggregateID string, out *hippo.A
 // Set stores aggregate has a form of hash key in Redis. Aggregate State is marshaled into string.
 func (s *CacheService) Set(ctx context.Context, aggregateID string, in *hippo.Aggregate) error {
 
-	fmt.Printf("%v \n", in)
-
 	fields := make(map[string]interface{})
 	fields["version"] = strconv.FormatInt(in.Version, 10)
 	fields["schema"] = fmt.Sprintf("%T", in.State)
