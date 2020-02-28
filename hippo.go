@@ -119,11 +119,15 @@ func (c *Client) SetCacheService(cache CacheService) {
 	c.cache = cache
 }
 
-// Dispatch returns an aggregate based on a event message and domain rules
-func (c *Client) Dispatch(ctx context.Context, msg Message, domain Domain, hooks ...HookFn) (*Aggregate, error) {
+// Dispatch returns an aggregate resource based on the event and domain rules defined
+func (c *Client) Dispatch(ctx context.Context, event *Event, domain Domain, hooks ...HookFn) (*Aggregate, error) {
+
+	if event.AggregateID == "" {
+		return nil, ErrAggregateIDCanNotBeEmpty
+	}
 
 	// Fetch aggregate.
-	agg, err := c.fetch(ctx, msg, domain)
+	agg, err := c.fetch(ctx, event.AggregateID, domain)
 	if err != nil {
 		return nil, err
 	}
@@ -136,21 +140,21 @@ func (c *Client) Dispatch(ctx context.Context, msg Message, domain Domain, hooks
 	}
 
 	// Increment version by one and assign it to the new event
-	msg.Event.SetVersion(agg.Version + 1)
+	event.SetVersion(agg.Version + 1)
 
 	// Persist event to datastore
-	if err := c.store.EventService().Create(ctx, msg.Event); err != nil {
+	if err := c.store.EventService().Create(ctx, event); err != nil {
 		return nil, err
 	}
 
 	// Apply last event to the aggregator store
-	if err := agg.apply(msg.Event, domain); err != nil {
+	if err := agg.apply(event, domain); err != nil {
 		return nil, err
 	}
 
 	// If CacheService is defined store aggregate in cache.
 	if c.cache != nil {
-		if err := c.cache.Set(ctx, msg.ID, agg); err != nil {
+		if err := c.cache.Set(ctx, event.AggregateID, agg); err != nil {
 			return nil, err
 		}
 	}
@@ -158,11 +162,11 @@ func (c *Client) Dispatch(ctx context.Context, msg Message, domain Domain, hooks
 	return agg, nil
 }
 
-func (c *Client) fetch(ctx context.Context, msg Message, domain Domain) (*Aggregate, error) {
+func (c *Client) fetch(ctx context.Context, aggregateID string, domain Domain) (*Aggregate, error) {
 
 	// Get last aggregate version to do a optimistic concurrency test
 	// on the data coming in.
-	v, err := c.store.EventService().GetLastVersion(ctx, msg.ID)
+	v, err := c.store.EventService().GetLastVersion(ctx, aggregateID)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +176,7 @@ func (c *Client) fetch(ctx context.Context, msg Message, domain Domain) (*Aggreg
 		agg := &Aggregate{
 			State: domain.Output,
 		}
-		if err := c.cache.Get(ctx, msg.ID, agg); err == nil {
+		if err := c.cache.Get(ctx, aggregateID, agg); err == nil {
 			// Check if verssion from cache is the version expected.
 			if agg.Version == v {
 				return agg, nil
@@ -184,7 +188,7 @@ func (c *Client) fetch(ctx context.Context, msg Message, domain Domain) (*Aggreg
 	agg := &Aggregate{}
 
 	// Fetch events from datastore
-	events, err := c.store.EventService().List(ctx, Params{ID: msg.ID})
+	events, err := c.store.EventService().List(ctx, Params{ID: aggregateID})
 	if err != nil {
 		return nil, err
 	}

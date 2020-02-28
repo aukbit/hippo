@@ -8,9 +8,10 @@ const (
 
 // Event errors.
 const (
-	ErrConcurrencyException    = Error("concurrency exception")
-	ErrEventFormatIsInvalid    = Error("event data is not encoded in the right format")
-	ErrSchemaProvidedIsInvalid = Error("schema provided to decode event data is invalid")
+	ErrAggregateIDCanNotBeEmpty = Error("aggregateID can not be empty")
+	ErrConcurrencyException     = Error("concurrency exception")
+	ErrEventFormatIsInvalid     = Error("event data is not encoded in the right format")
+	ErrSchemaProvidedIsInvalid  = Error("schema provided to decode event data is invalid")
 )
 
 // Cache errors.

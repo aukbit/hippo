@@ -62,6 +62,18 @@ func NewEvent(topic, aggregateID string) *Event {
 	}
 }
 
+// NewEventProto returns an event resource.
+func NewEventProto(topic, aggregateID string, data proto.Message) *Event {
+	e := &Event{
+		Topic:       topic,
+		AggregateID: aggregateID,
+		CreateTime:  time.Now().UTC(),
+	}
+	// Marshal data and assign it to event
+	e.MarshalProto(data)
+	return e
+}
+
 // NewEventWithMetadata returns an event resource.
 func NewEventWithMetadata(topic, aggregateID string, metadata map[string]string) *Event {
 	return &Event{

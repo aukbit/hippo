@@ -20,16 +20,7 @@ func TestStore_Dispatch(t *testing.T) {
 	}
 
 	// Create new event for user_created topic.
-	ev1 := hippo.NewEvent("user_created", user.GetId())
-	// Marshal user proto and assign it to event data
-	if err := ev1.MarshalProto(&user); err != nil {
-		t.Fatal(err)
-	}
-
-	msg := hippo.Message{
-		ID:    user.GetId(),
-		Event: ev1,
-	}
+	ev1 := hippo.NewEventProto("user_created", user.GetId(), &user)
 
 	var ss mock.StoreService
 	var es mock.EventService
@@ -71,7 +62,7 @@ func TestStore_Dispatch(t *testing.T) {
 	domain := hippo.Domain{Output: &next, Rules: rules}
 
 	// Create event 1 in store.
-	if store, err := clt.Dispatch(ctx, msg, domain); err != nil {
+	if store, err := clt.Dispatch(ctx, ev1, domain); err != nil {
 		t.Fatal(err)
 	} else if _, ok := store.State.(*pb.User); !ok {
 		t.Fatalf("unexpected store state type: %T ", store.State)
@@ -95,16 +86,7 @@ func TestStoreWithCache_Dispatch(t *testing.T) {
 	}
 
 	// Create new event for user_created topic.
-	ev1 := hippo.NewEvent("user_created", user.GetId())
-	// Marshal user proto and assign it to event data
-	if err := ev1.MarshalProto(&user); err != nil {
-		t.Fatal(err)
-	}
-
-	msg := hippo.Message{
-		ID:    user.GetId(),
-		Event: ev1,
-	}
+	ev1 := hippo.NewEventProto("user_created", user.GetId(), &user)
 
 	var ss mock.StoreService
 	var es mock.EventService
@@ -160,7 +142,7 @@ func TestStoreWithCache_Dispatch(t *testing.T) {
 	domain := hippo.Domain{Output: &pb.User{}, Rules: rules}
 
 	// Create event 1 in store.
-	if store, err := clt.Dispatch(ctx, msg, domain); err != nil {
+	if store, err := clt.Dispatch(ctx, ev1, domain); err != nil {
 		t.Fatal(err)
 	} else if _, ok := store.State.(*pb.User); !ok {
 		t.Fatalf("unexpected store state type: %T ", store.State)
