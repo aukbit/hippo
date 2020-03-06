@@ -24,18 +24,7 @@ func helloHandler(clt *hippo.Client) http.Handler {
 		// Create new event for user_created topic.
 		evt := hippo.NewEventProto("user_created", user.GetId(), &user)
 
-		rules := func(topic string, old, new interface{}) interface{} {
-			switch topic {
-			default:
-				return old
-			case "user_created":
-				return new
-			}
-		}
-
-		domain := hippo.Domain{Output: &pb.User{}, Rules: rules}
-
-		store, err := clt.Dispatch(ctx, evt, domain)
+		store, err := clt.Dispatch(ctx, evt, &pb.User{})
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -45,6 +34,15 @@ func helloHandler(clt *hippo.Client) http.Handler {
 		// Write it back to the client.
 		fmt.Fprintf(w, "hi %s!\n", state.GetName())
 	})
+}
+
+func userRules(topic string, buffer, previous interface{}) (next interface{}) {
+	switch topic {
+	default:
+		return previous
+	case "user_created":
+		return buffer
+	}
 }
 
 func main() {
@@ -57,6 +55,7 @@ func main() {
 	}
 
 	client := hippo.NewClient(store)
+	client.RegisterDomainRules(userRules, &pb.User{})
 
 	// Register our handler.
 	http.Handle("/hello", helloHandler(client))

@@ -45,24 +45,23 @@ func TestStore_Dispatch(t *testing.T) {
 		return nil
 	}
 
-	clt := hippo.NewClient(&ss)
-
-	ctx := context.Background()
-
-	rules := func(topic string, state, new interface{}) interface{} {
+	// Domain Type Rules
+	rules := func(topic string, buffer, previous interface{}) (next interface{}) {
 		switch topic {
 		default:
-			return state
+			return previous
 		case "user_created":
-			return new
+			return buffer
 		}
 	}
 
-	var next pb.User
-	domain := hippo.Domain{Output: &next, Rules: rules}
+	clt := hippo.NewClient(&ss)
+	clt.RegisterDomainRules(rules, &pb.User{})
+
+	ctx := context.Background()
 
 	// Create event 1 in store.
-	if store, err := clt.Dispatch(ctx, ev1, domain); err != nil {
+	if store, err := clt.Dispatch(ctx, ev1, &pb.User{}); err != nil {
 		t.Fatal(err)
 	} else if _, ok := store.State.(*pb.User); !ok {
 		t.Fatalf("unexpected store state type: %T ", store.State)
@@ -116,33 +115,33 @@ func TestStoreWithCache_Dispatch(t *testing.T) {
 		return nil
 	}
 
-	clt := hippo.NewClient(&ss)
-
-	//
-	clt.SetCacheService(&cs)
-
-	ctx := context.Background()
-
-	rules := func(topic string, old, new interface{}) interface{} {
-		o := old.(*pb.User)
+	// Domain Type Rules
+	rules := func(topic string, buffer, previous interface{}) (next interface{}) {
+		p := previous.(*pb.User)
 		switch topic {
 		default:
-			return old
+			return previous
 		case "user_created":
-			return new
+			return buffer
 		case "user_updated":
-			n := new.(*pb.User)
-			if n.GetName() != "" && o.GetName() != n.GetName() {
-				o.Name = n.GetName()
+			b := buffer.(*pb.User)
+			if b.GetName() != "" && p.GetName() != b.GetName() {
+				p.Name = b.GetName()
 			}
-			return o
+			return p
 		}
 	}
 
-	domain := hippo.Domain{Output: &pb.User{}, Rules: rules}
+	clt := hippo.NewClient(&ss)
+	clt.RegisterDomainRules(rules, &pb.User{})
+
+	//
+	clt.RegisterCacheService(&cs)
+
+	ctx := context.Background()
 
 	// Create event 1 in store.
-	if store, err := clt.Dispatch(ctx, ev1, domain); err != nil {
+	if store, err := clt.Dispatch(ctx, ev1, &pb.User{}); err != nil {
 		t.Fatal(err)
 	} else if _, ok := store.State.(*pb.User); !ok {
 		t.Fatalf("unexpected store state type: %T ", store.State)

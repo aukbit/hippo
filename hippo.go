@@ -3,6 +3,7 @@ package hippo
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/golang/protobuf/proto"
 )
@@ -38,23 +39,15 @@ type Params struct {
 // Please note that the new event is not yet dispatched / persisted when the HookFn is called.
 type HookFn func(*Aggregate) error
 
-// Domain ..
-type Domain struct {
-	Output interface{}
-	Rules  DomainRulesFn
-}
+// DomainTypeRulesFn represents a function type to define how data in buffer could
+// change the previous State into the next State for a specific topic.
+type DomainTypeRulesFn func(topic string, buffer, previous interface{}) (next interface{})
 
-// DomainRulesFn represents a function type for domain rules.
-// Domain rules define how the new data received changes the aggregate state.
-type DomainRulesFn func(topic string, old, new interface{}) (next interface{})
+// DomainTypeRulesMap a map from domain type names to map domain type rules function
+type DomainTypeRulesMap map[string]DomainTypeRulesFn
 
-// Data is a replica of proto.Message which is implemented by generated protocol buffer messages.
-// We find using protocol buffers quite useful to marshal and unmarshal objects
-type Data interface {
-	Reset()
-	String() string
-	ProtoMessage()
-}
+// Version type.
+type Version int64
 
 // Aggregate represents an aggregator state and respective version
 type Aggregate struct {
@@ -63,10 +56,10 @@ type Aggregate struct {
 }
 
 // load takes a list of events and apply them to the aggregate
-func (a *Aggregate) load(events []*Event, domain Domain) error {
+func (a *Aggregate) load(events []*Event, buffer interface{}, fn DomainTypeRulesFn) error {
 
 	for _, e := range events {
-		if err := a.apply(e, domain); err != nil {
+		if err := a.apply(e, buffer, fn); err != nil {
 			return err
 		}
 	}
@@ -76,14 +69,13 @@ func (a *Aggregate) load(events []*Event, domain Domain) error {
 
 // apply applies changes to the current state based on the domain rules defined for the
 // respective event topic
-func (a *Aggregate) apply(e *Event, domain Domain) error {
-
+func (a *Aggregate) apply(e *Event, buffer interface{}, fn DomainTypeRulesFn) error {
 	switch e.Format {
 	case PROTOBUF:
-		if e.Schema != fmt.Sprintf("%T", domain.Output) {
-			return ErrSchemaProvidedIsInvalid
-		}
-		if err := e.UnmarshalProto(domain.Output.(proto.Message)); err != nil {
+		// if e.Schema != fmt.Sprintf("%T", buffer) {
+		// 	return ErrSchemaProvidedIsInvalid
+		// }
+		if err := e.UnmarshalProto(buffer.(proto.Message)); err != nil {
 			return err
 		}
 	case JSON:
@@ -95,7 +87,7 @@ func (a *Aggregate) apply(e *Event, domain Domain) error {
 	}
 
 	// run rules for the event topic and update aggregate state accordingly
-	a.State = domain.Rules(e.Topic, a.State, domain.Output)
+	a.State = fn(e.Topic, buffer, a.State)
 	// set state version the same as the aggregator
 	a.Version = e.Version
 	return nil
@@ -103,31 +95,54 @@ func (a *Aggregate) apply(e *Event, domain Domain) error {
 
 // Client to hold store service implementation
 type Client struct {
-	store StoreService
-	cache CacheService
+	store         StoreService
+	cache         CacheService
+	rulesRegistry map[string]DomainTypeRulesFn // a map from domain type names to map functions
 }
 
 // NewClient return client struct
 func NewClient(s StoreService) *Client {
 	return &Client{
-		store: s,
+		store:         s,
+		rulesRegistry: make(DomainTypeRulesMap),
 	}
 }
 
-// SetCacheService assigns a cache service to the client store
-func (c *Client) SetCacheService(cache CacheService) {
+// RegisterDomainRules assigns a cache service to the client store
+func (c *Client) RegisterDomainRules(fn DomainTypeRulesFn, domainType interface{}) {
+	name := fmt.Sprintf("%T", domainType)
+	if _, ok := c.rulesRegistry[name]; ok {
+		log.Printf("duplicate domain type registered: %s", name)
+		return
+	}
+	c.rulesRegistry[name] = fn
+}
+
+// Rules returns domain function rules for a specific domain type
+// if domain types not previously registered log and return template function
+func (c *Client) Rules(domainType interface{}) DomainTypeRulesFn {
+	name := fmt.Sprintf("%T", domainType)
+	if _, ok := c.rulesRegistry[name]; !ok {
+		log.Printf("domain type NOT registered: %s", name)
+		return func(topic string, buffer, previous interface{}) (next interface{}) { return buffer }
+	}
+	return c.rulesRegistry[name]
+}
+
+// RegisterCacheService assigns a cache service to the client store
+func (c *Client) RegisterCacheService(cache CacheService) {
 	c.cache = cache
 }
 
 // Dispatch returns an aggregate resource based on the event and domain rules defined
-func (c *Client) Dispatch(ctx context.Context, event *Event, domain Domain, hooks ...HookFn) (*Aggregate, error) {
+func (c *Client) Dispatch(ctx context.Context, event *Event, buffer interface{}, hooks ...HookFn) (*Aggregate, error) {
 
 	if event.AggregateID == "" {
 		return nil, ErrAggregateIDCanNotBeEmpty
 	}
 
 	// Fetch aggregate.
-	agg, err := c.fetch(ctx, event.AggregateID, domain)
+	agg, err := c.fetch(ctx, event.AggregateID, buffer)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +163,7 @@ func (c *Client) Dispatch(ctx context.Context, event *Event, domain Domain, hook
 	}
 
 	// Apply last event to the aggregator store
-	if err := agg.apply(event, domain); err != nil {
+	if err := agg.apply(event, buffer, c.Rules(buffer)); err != nil {
 		return nil, err
 	}
 
@@ -162,7 +177,7 @@ func (c *Client) Dispatch(ctx context.Context, event *Event, domain Domain, hook
 	return agg, nil
 }
 
-func (c *Client) fetch(ctx context.Context, aggregateID string, domain Domain) (*Aggregate, error) {
+func (c *Client) fetch(ctx context.Context, aggregateID string, buffer interface{}) (*Aggregate, error) {
 
 	// Get last aggregate version to do a optimistic concurrency test
 	// on the data coming in.
@@ -174,7 +189,7 @@ func (c *Client) fetch(ctx context.Context, aggregateID string, domain Domain) (
 	// If CacheService is defined check in Cache first.
 	if c.cache != nil {
 		agg := &Aggregate{
-			State: domain.Output,
+			State: buffer,
 		}
 		if err := c.cache.Get(ctx, aggregateID, agg); err == nil {
 			// Check if verssion from cache is the version expected.
@@ -194,7 +209,7 @@ func (c *Client) fetch(ctx context.Context, aggregateID string, domain Domain) (
 	}
 
 	// Load events into the aggregate
-	if err := agg.load(events, domain); err != nil {
+	if err := agg.load(events, buffer, c.Rules(buffer)); err != nil {
 		return nil, err
 	}
 
