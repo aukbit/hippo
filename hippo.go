@@ -72,9 +72,9 @@ func (a *Aggregate) load(events []*Event, buffer interface{}, fn DomainTypeRules
 func (a *Aggregate) apply(e *Event, buffer interface{}, fn DomainTypeRulesFn) error {
 	switch e.Format {
 	case PROTOBUF:
-		// if e.Schema != fmt.Sprintf("%T", buffer) {
-		// 	return ErrSchemaProvidedIsInvalid
-		// }
+		if e.Schema != fmt.Sprintf("%T", buffer) {
+			return ErrSchemaProvidedIsInvalid
+		}
 		if err := e.UnmarshalProto(buffer.(proto.Message)); err != nil {
 			return err
 		}
