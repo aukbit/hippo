@@ -18,7 +18,7 @@ func TestEvent_MarshalProto(t *testing.T) {
 		Email: "test@email.com",
 	}
 
-	event := NewEvent("event_created", "123ABC", nil)
+	event := NewEvent("event_created", "123ABC")
 
 	var other pb.User
 	if err := event.MarshalProto(&user); err != nil {

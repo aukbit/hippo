@@ -1,3 +1,13 @@
+Version 0.2.0:
+ - verify schema if protobuf
+ - define registry domain rules
+ - remove debug log
+ - define new event proto
+ - review function signatures
+ - draft redis package - refactor dispatch call
+ - draft cache service interface
+ - Merge branch release-0.1.0
+
 Version 0.1.0
  - ignore version script
  - refactor naming and mock hippo services

@@ -13,6 +13,8 @@ import (
 func helloHandler(clt *hippo.Client) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
+		ctx := r.Context()
+
 		user := pb.User{
 			Id:    rand.String(10),
 			Name:  "example",
@@ -20,34 +22,9 @@ func helloHandler(clt *hippo.Client) http.Handler {
 		}
 
 		// Create new event for user_created topic.
-		ev1 := hippo.NewEvent("user_created", user.GetId(), nil)
-		// Marshal user proto and assign it to event data
-		if err := ev1.MarshalProto(&user); err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
+		evt := hippo.NewEventProto("user_created", user.GetId(), &user)
 
-		msg := hippo.Message{
-			ID:    user.GetId(),
-			Event: ev1,
-		}
-
-		rules := func(e *hippo.Event, state interface{}) (interface{}, error) {
-			n := pb.User{}
-			if e.Schema == fmt.Sprintf("%T", &pb.User{}) {
-				if err := e.UnmarshalProto(&n); err != nil {
-					return nil, err
-				}
-			}
-			switch e.Topic {
-			default:
-				return state, nil
-			case "user_created":
-				return &n, nil
-			}
-		}
-
-		store, err := clt.Dispatch(r.Context(), msg, rules)
+		store, err := clt.Dispatch(ctx, evt, &pb.User{})
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
@@ -57,6 +34,15 @@ func helloHandler(clt *hippo.Client) http.Handler {
 		// Write it back to the client.
 		fmt.Fprintf(w, "hi %s!\n", state.GetName())
 	})
+}
+
+func userRules(topic string, buffer, previous interface{}) (next interface{}) {
+	switch topic {
+	default:
+		return previous
+	case "user_created":
+		return buffer
+	}
 }
 
 func main() {
@@ -69,6 +55,7 @@ func main() {
 	}
 
 	client := hippo.NewClient(store)
+	client.RegisterDomainRules(userRules, &pb.User{})
 
 	// Register our handler.
 	http.Handle("/hello", helloHandler(client))

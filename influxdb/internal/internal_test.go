@@ -11,7 +11,7 @@ import (
 
 // Ensure event can be marshaled and unmarshaled.
 func TestMarshalEvent(t *testing.T) {
-	e := hippo.NewEvent("event_created", "123ABC", map[string]string{"eid": "12345"})
+	e := hippo.NewEventWithMetadata("event_created", "123ABC", map[string]string{"eid": "12345"})
 	e.Version = 1
 	e.Schema = "string"
 	e.Format = hippo.STRING
@@ -33,7 +33,7 @@ func TestMarshalEvent(t *testing.T) {
 }
 
 func TestMarshalEventText(t *testing.T) {
-	e := hippo.NewEvent("event_created", "123ABC", map[string]string{"eid": "12345"})
+	e := hippo.NewEventWithMetadata("event_created", "123ABC", map[string]string{"eid": "12345"})
 	e.Version = 1
 	e.Schema = "string"
 	e.Format = hippo.STRING

@@ -21,7 +21,7 @@ func TestEventService_Create(t *testing.T) {
 	}
 
 	// Create new event for user_created topic.
-	event := hippo.NewEvent("user_created", user.GetId(), nil)
+	event := hippo.NewEvent("user_created", user.GetId())
 	// Marshal user proto and assign it to event data
 	if err := event.MarshalProto(&user); err != nil {
 		t.Fatal(err)
@@ -47,7 +47,7 @@ func TestEventService_GetLastVersion(t *testing.T) {
 	}
 
 	// Create new event for user_created topic.
-	event := hippo.NewEvent("user_created", user.GetId(), nil)
+	event := hippo.NewEvent("user_created", user.GetId())
 	// Marshal user proto and assign it to event data
 	if err := event.MarshalProto(&user); err != nil {
 		t.Fatal(err)
@@ -80,7 +80,7 @@ func TestEventService_ListEvents(t *testing.T) {
 	}
 
 	// Create new event for user_created topic.
-	ev1 := hippo.NewEvent("user_created", user.GetId(), nil)
+	ev1 := hippo.NewEvent("user_created", user.GetId())
 	// Marshal user proto and assign it to event data
 	if err := ev1.MarshalProto(&user); err != nil {
 		t.Fatal(err)
@@ -96,7 +96,7 @@ func TestEventService_ListEvents(t *testing.T) {
 	// Update user details.
 	user.Name = "my name changed to something else"
 	// Create new event for user_created topic.
-	ev2 := hippo.NewEvent("user_updated", user.GetId(), nil)
+	ev2 := hippo.NewEvent("user_updated", user.GetId())
 	// Marshal user proto and assign it to event data
 	if err := ev2.MarshalProto(&user); err != nil {
 		t.Fatal(err)
