@@ -1,3 +1,6 @@
+Version v0.2.1:
+ - Merge branch release-0.2.0
+
 Version 0.2.0:
  - verify schema if protobuf
  - define registry domain rules
