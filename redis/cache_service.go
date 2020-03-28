@@ -118,3 +118,8 @@ func (s *CacheService) Set(ctx context.Context, aggregateID string, in *hippo.Ag
 
 	return nil
 }
+
+// DB returns db connection
+func (s *CacheService) DB() interface{} {
+	return s.db
+}

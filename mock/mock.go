@@ -56,3 +56,7 @@ func (s *CacheService) Set(ctx context.Context, aggregateID string, in *hippo.Ag
 	s.SetInvoked = true
 	return s.SetFn(ctx, aggregateID, in)
 }
+
+func (s *CacheService) DB() interface{} {
+	return nil
+}
