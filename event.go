@@ -53,6 +53,11 @@ type Event struct {
 	CreateTime time.Time
 }
 
+// GetTopic returns event topic casted as Topic
+func (e *Event) GetTopic() Topic {
+	return Topic(e.Topic)
+}
+
 // NewEvent returns an event resource.
 func NewEvent(topic, aggregateID string) *Event {
 	return &Event{

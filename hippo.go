@@ -174,6 +174,9 @@ func (c *Client) Dispatch(ctx context.Context, event *Event, buffer interface{},
 		}
 	}
 
+	// Publish event to subscribers
+	publish(event)
+
 	return agg, nil
 }
 
