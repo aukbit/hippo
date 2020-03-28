@@ -17,6 +17,7 @@ type StoreService interface {
 type CacheService interface {
 	Get(ctx context.Context, aggregateID string, out *Aggregate) error
 	Set(ctx context.Context, aggregateID string, in *Aggregate) error
+	DB() interface{}
 }
 
 // Message represents ID and event to be dispatched
@@ -132,6 +133,11 @@ func (c *Client) Rules(domainType interface{}) DomainTypeRulesFn {
 // RegisterCacheService assigns a cache service to the client store
 func (c *Client) RegisterCacheService(cache CacheService) {
 	c.cache = cache
+}
+
+// CacheService assigns a cache service to the client store
+func (c *Client) CacheService() CacheService {
+	return c.cache
 }
 
 // Dispatch returns an aggregate resource based on the event and domain rules defined
