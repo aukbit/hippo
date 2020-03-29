@@ -7,7 +7,7 @@ import (
 
 	"github.com/aukbit/hippo"
 	"github.com/go-redis/redis"
-	"github.com/gogo/protobuf/proto"
+	"github.com/golang/protobuf/proto"
 )
 
 var _ hippo.CacheService = &CacheService{}
