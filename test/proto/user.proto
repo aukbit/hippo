@@ -7,5 +7,10 @@ message User {
     string id = 1;
     string name = 2;
     string email = 3;
+    repeated Role roles = 4;
 }
 
+enum Role {
+    DEFAULT = 0;
+    ADMIN = 1;
+}
