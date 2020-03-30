@@ -75,6 +75,26 @@ func TestStore_Dispatch(t *testing.T) {
 	assert.Equal(t, true, es.GetLastVersionInvoked)
 	assert.Equal(t, true, es.ListInvoked)
 
+	// Create event 2 for nothing_changed topic.
+	ev2 := hippo.NewEventProto("nothing_changed", user.GetId(), &pb.User{Id: user.GetId()})
+
+	// Mock EventService.List()
+	es.ListFn = func(ctx context.Context, p hippo.Params) ([]*hippo.Event, error) {
+		return []*hippo.Event{ev1, ev2}, nil
+	}
+
+	// Create event 2 in store.
+	if store, err := clt.Dispatch(ctx, ev2, &pb.User{}); err != nil {
+		t.Fatal(err)
+	} else if u, ok := store.State.(*pb.User); !ok {
+		t.Fatalf("unexpected store state type: %T ", store.State)
+	} else if u.GetId() != user.GetId() {
+		t.Fatalf("unexpected id %v ", u.GetId())
+	} else if u.GetName() != user.GetName() {
+		t.Fatalf("unexpected name %v ", u.GetName())
+	} else if u.GetEmail() != user.GetEmail() {
+		t.Fatalf("unexpected email %v ", u.GetEmail())
+	}
 }
 
 func TestStore_WithCache(t *testing.T) {

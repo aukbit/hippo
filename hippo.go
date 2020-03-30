@@ -71,6 +71,14 @@ func (a *Aggregate) load(events []*Event, buffer interface{}, fn DomainTypeRules
 // apply applies changes to the current state based on the domain rules defined for the
 // respective event topic
 func (a *Aggregate) apply(e *Event, buffer interface{}, fn DomainTypeRulesFn) error {
+
+	// Create a clone of the state to be used as previous
+	var previous proto.Message
+	if a.State != nil {
+		previous = proto.Clone(a.State.(proto.Message))
+	}
+
+	// Unmarshal event to buffer
 	switch e.Format {
 	case PROTOBUF:
 		if e.Schema != fmt.Sprintf("%T", buffer) {
@@ -88,7 +96,8 @@ func (a *Aggregate) apply(e *Event, buffer interface{}, fn DomainTypeRulesFn) er
 	}
 
 	// run rules for the event topic and update aggregate state accordingly
-	a.State = fn(e.Topic, buffer, a.State)
+	a.State = fn(e.Topic, buffer, previous)
+
 	// set state version the same as the aggregator
 	a.Version = e.Version
 	return nil
