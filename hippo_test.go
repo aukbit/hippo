@@ -62,7 +62,7 @@ func TestStore_Dispatch(t *testing.T) {
 	ctx := context.Background()
 
 	// Create event 1 in store.
-	if store, err := clt.Dispatch(ctx, ev1, &pb.User{}); err != nil {
+	if store, err := clt.Dispatch(ctx, ev1, &user); err != nil {
 		t.Fatal(err)
 	} else if _, ok := store.State.(*pb.User); !ok {
 		t.Fatalf("unexpected store state type: %T ", store.State)
@@ -76,7 +76,10 @@ func TestStore_Dispatch(t *testing.T) {
 	assert.Equal(t, true, es.ListInvoked)
 
 	// Create event 2 for nothing_changed topic.
-	ev2 := hippo.NewEventProto("nothing_changed", user.GetId(), &pb.User{Id: user.GetId()})
+	user2 := pb.User{
+		Id: user.GetId(),
+	}
+	ev2 := hippo.NewEventProto("nothing_changed", user.GetId(), &user2)
 
 	// Mock EventService.List()
 	es.ListFn = func(ctx context.Context, p hippo.Params) ([]*hippo.Event, error) {
@@ -84,7 +87,7 @@ func TestStore_Dispatch(t *testing.T) {
 	}
 
 	// Create event 2 in store.
-	if store, err := clt.Dispatch(ctx, ev2, &pb.User{}); err != nil {
+	if store, err := clt.Dispatch(ctx, ev2, &user2); err != nil {
 		t.Fatal(err)
 	} else if u, ok := store.State.(*pb.User); !ok {
 		t.Fatalf("unexpected store state type: %T ", store.State)

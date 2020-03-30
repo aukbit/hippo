@@ -118,6 +118,49 @@ func (e *Event) UnmarshalProto(pb proto.Message) error {
 	return nil
 }
 
+// Marshal data to event data
+func (e *Event) Marshal(in interface{}) error {
+	//
+	switch e.Format {
+	case PROTOBUF:
+		if err := e.MarshalProto(in.(proto.Message)); err != nil {
+			return err
+		}
+	case JSON:
+		// TODO
+		return ErrNotImplemented
+	case STRING:
+		// TODO
+		return ErrNotImplemented
+	default:
+		return ErrFormatNotProvided
+	}
+	return nil
+}
+
+// Unmarshal event data to out
+func (e *Event) Unmarshal(out interface{}) error {
+	//
+	switch e.Format {
+	case PROTOBUF:
+		if e.Schema != fmt.Sprintf("%T", out) {
+			return ErrSchemaProvidedIsInvalid
+		}
+		if err := e.UnmarshalProto(out.(proto.Message)); err != nil {
+			return err
+		}
+	case JSON:
+		// TODO
+		return ErrNotImplemented
+	case STRING:
+		// TODO
+		return ErrNotImplemented
+	default:
+		return ErrFormatNotProvided
+	}
+	return nil
+}
+
 // SetVersion assign event version
 func (e *Event) SetVersion(version int64) {
 	e.Version = version
