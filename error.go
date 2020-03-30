@@ -9,6 +9,8 @@ const (
 // Event errors.
 const (
 	ErrAggregateIDCanNotBeEmpty = Error("aggregateID can not be empty")
+	ErrBufferCanNotBeNil        = Error("buffer can not be nil")
+	ErrFormatNotProvided        = Error("format is not provided")
 	ErrConcurrencyException     = Error("concurrency exception")
 	ErrEventFormatIsInvalid     = Error("event data is not encoded in the right format")
 	ErrSchemaProvidedIsInvalid  = Error("schema provided to decode event data is invalid")

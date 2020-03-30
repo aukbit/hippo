@@ -72,27 +72,10 @@ func (a *Aggregate) load(events []*Event, buffer interface{}, fn DomainTypeRules
 // respective event topic
 func (a *Aggregate) apply(e *Event, buffer interface{}, fn DomainTypeRulesFn) error {
 
-	// Create a clone of the state to be used as previous
-	var previous proto.Message
-	if a.State != nil {
-		previous = proto.Clone(a.State.(proto.Message))
-	}
+	previous := clone(e.Format, a.State)
 
-	// Unmarshal event to buffer
-	switch e.Format {
-	case PROTOBUF:
-		if e.Schema != fmt.Sprintf("%T", buffer) {
-			return ErrSchemaProvidedIsInvalid
-		}
-		if err := e.UnmarshalProto(buffer.(proto.Message)); err != nil {
-			return err
-		}
-	case JSON:
-		// TODO
-		return ErrNotImplemented
-	case STRING:
-		// TODO
-		return ErrNotImplemented
+	if err := e.Unmarshal(buffer); err != nil {
+		return err
 	}
 
 	// run rules for the event topic and update aggregate state accordingly
@@ -100,6 +83,25 @@ func (a *Aggregate) apply(e *Event, buffer interface{}, fn DomainTypeRulesFn) er
 
 	// set state version the same as the aggregator
 	a.Version = e.Version
+	return nil
+}
+
+// Returns a deep copy of data based on format
+func clone(format Format, data interface{}) interface{} {
+	switch format {
+	case PROTOBUF:
+		if data != nil {
+			return proto.Clone(data.(proto.Message))
+		}
+	case JSON:
+		// TODO
+		return ErrNotImplemented
+	case STRING:
+		// TODO
+		return ErrNotImplemented
+	default:
+		return ErrFormatNotProvided
+	}
 	return nil
 }
 
@@ -156,8 +158,21 @@ func (c *Client) Dispatch(ctx context.Context, event *Event, buffer interface{},
 		return nil, ErrAggregateIDCanNotBeEmpty
 	}
 
+	if buffer == nil {
+		return nil, ErrBufferCanNotBeNil
+	}
+
+	// Create a clone of the buffer so that event data can be unmarshaled
+	// and hooks would be able to change buffer data since buffer will be
+	// marshaled immediately after the hooks processed
+	tmp := clone(event.Format, buffer)
+
+	if err := event.Unmarshal(tmp); err != nil {
+		return nil, err
+	}
+
 	// Fetch aggregate.
-	agg, err := c.fetch(ctx, event.AggregateID, buffer)
+	agg, err := c.fetch(ctx, event.AggregateID, tmp)
 	if err != nil {
 		return nil, err
 	}
@@ -167,6 +182,10 @@ func (c *Client) Dispatch(ctx context.Context, event *Event, buffer interface{},
 		if err := h(agg); err != nil {
 			return nil, err
 		}
+	}
+
+	if err := event.Marshal(buffer); err != nil {
+		return nil, err
 	}
 
 	// Increment version by one and assign it to the new event
