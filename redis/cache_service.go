@@ -75,11 +75,13 @@ func (s *CacheService) Get(ctx context.Context, aggregateID string, out *hippo.A
 
 	// Get version and state fields from aggregate hash key in Redis.
 	cmd := s.db.HGetAll(aggregateID)
-
-	if cmd.Err() != nil && cmd.Err() == redis.Nil {
-		return hippo.ErrKeyDoesNotExist
-	} else if cmd.Err() != nil {
+	if cmd.Err() != nil {
 		return cmd.Err()
+	}
+
+	// Redis returns empty list when key does not exist
+	if len(cmd.Val()) == 0 {
+		return hippo.ErrKeyDoesNotExist
 	}
 
 	if v, ok := cmd.Val()["version"]; !ok {
