@@ -172,7 +172,7 @@ func (c *Client) Dispatch(ctx context.Context, event *Event, buffer interface{},
 	}
 
 	// Fetch aggregate.
-	agg, err := c.fetch(ctx, event.AggregateID, tmp)
+	agg, err := c.Fetch(ctx, event.AggregateID, tmp)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +214,8 @@ func (c *Client) Dispatch(ctx context.Context, event *Event, buffer interface{},
 	return agg, nil
 }
 
-func (c *Client) fetch(ctx context.Context, aggregateID string, buffer interface{}) (*Aggregate, error) {
+// Fetch returns an aggregate resource based on the aggregateID and domain type
+func (c *Client) Fetch(ctx context.Context, aggregateID string, buffer interface{}) (*Aggregate, error) {
 
 	// Get last aggregate version to do a optimistic concurrency test
 	// on the data coming in.
