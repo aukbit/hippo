@@ -109,7 +109,7 @@ func (e *Event) MarshalProto(pb proto.Message) error {
 // the data in buf, the results can be unpredictable.
 func (e *Event) UnmarshalProto(pb proto.Message) error {
 	if e.Format != PROTOBUF {
-		return ErrEventFormatIsInvalid
+		return ErrInvalidEventFormat
 	}
 	err := proto.Unmarshal(e.Data, pb)
 	if err != nil {
@@ -144,7 +144,7 @@ func (e *Event) Unmarshal(out interface{}) error {
 	switch e.Format {
 	case PROTOBUF:
 		if e.Schema != fmt.Sprintf("%T", out) {
-			return ErrSchemaProvidedIsInvalid
+			return ErrInvalidSchema
 		}
 		if err := e.UnmarshalProto(out.(proto.Message)); err != nil {
 			return err
