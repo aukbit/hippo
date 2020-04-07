@@ -141,7 +141,7 @@ func TestStore_FetchNoEvents(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := clt.Fetch(ctx, "someid", &pb.User{})
-	assert.Equal(t, hippo.ErrNoEventsToBuildState, err)
+	assert.Equal(t, hippo.ErrAggregateIDWithoutEvents, err)
 
 }
 
