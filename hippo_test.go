@@ -100,6 +100,51 @@ func TestStore_Dispatch(t *testing.T) {
 	}
 }
 
+func TestStore_FetchNoEvents(t *testing.T) {
+
+	var ss mock.StoreService
+	var es mock.EventService
+
+	// Mock StoreService.EventService() call.
+	ss.EventServiceFn = func() *mock.EventService {
+		return &es
+	}
+
+	// Mock EventService.List()
+	es.ListFn = func(ctx context.Context, p hippo.Params) ([]*hippo.Event, error) {
+		return []*hippo.Event{}, nil
+	}
+
+	// Mock EventService.GetLastVersion()
+	es.GetLastVersionFn = func(ctx context.Context, aggregateID string) (int64, error) {
+		return 0, nil
+	}
+
+	// Mock EventService.GetLastVersion()
+	es.CreateFn = func(ctx context.Context, e *hippo.Event) error {
+		return nil
+	}
+
+	// Domain Type Rules
+	rules := func(topic string, buffer, previous interface{}) (next interface{}) {
+		switch topic {
+		default:
+			return previous
+		case "user_created":
+			return buffer
+		}
+	}
+
+	clt := hippo.NewClient(&ss)
+	clt.RegisterDomainRules(rules, &pb.User{})
+
+	ctx := context.Background()
+
+	_, err := clt.Fetch(ctx, "someid", &pb.User{})
+	assert.Equal(t, hippo.ErrNoEventsToBuildState, err)
+
+}
+
 func TestStore_WithCache(t *testing.T) {
 
 	user := pb.User{

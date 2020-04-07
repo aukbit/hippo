@@ -12,8 +12,10 @@ const (
 	ErrBufferCanNotBeNil        = Error("buffer can not be nil")
 	ErrFormatNotProvided        = Error("format is not provided")
 	ErrConcurrencyException     = Error("concurrency exception")
-	ErrEventFormatIsInvalid     = Error("event data is not encoded in the right format")
-	ErrSchemaProvidedIsInvalid  = Error("schema provided to decode event data is invalid")
+	ErrNoEventsToBuildState     = Error("no events to build state")
+	ErrEmptyState               = Error("aggregate with empty state")
+	ErrInvalidEventFormat       = Error("event data is not encoded in the right format")
+	ErrInvalidSchema            = Error("invalid schema schema to decode event data")
 )
 
 // Cache errors.

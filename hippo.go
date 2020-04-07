@@ -246,6 +246,10 @@ func (c *Client) Fetch(ctx context.Context, aggregateID string, buffer interface
 		return nil, err
 	}
 
+	if len(events) == 0 {
+		return nil, ErrNoEventsToBuildState
+	}
+
 	// Load events into the aggregate
 	if err := agg.load(events, buffer, c.Rules(buffer)); err != nil {
 		return nil, err
@@ -255,6 +259,10 @@ func (c *Client) Fetch(ctx context.Context, aggregateID string, buffer interface
 	// it will raise a concurrency exception
 	if agg.Version != v {
 		return nil, ErrConcurrencyException
+	}
+
+	if agg.State == nil {
+		return nil, ErrEmptyState
 	}
 
 	return agg, nil
