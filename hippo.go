@@ -173,7 +173,7 @@ func (c *Client) Dispatch(ctx context.Context, event *Event, buffer interface{},
 
 	// Fetch aggregate.
 	agg, err := c.Fetch(ctx, event.AggregateID, tmp)
-	if err != nil {
+	if err != nil && err != ErrAggregateIDWithoutEvents && err != ErrEmptyState {
 		return nil, err
 	}
 
