@@ -247,7 +247,7 @@ func (c *Client) Fetch(ctx context.Context, aggregateID string, buffer interface
 	}
 
 	if len(events) == 0 {
-		return nil, ErrAggregateIDWithoutEvents
+		return agg, ErrAggregateIDWithoutEvents
 	}
 
 	// Load events into the aggregate
@@ -262,7 +262,7 @@ func (c *Client) Fetch(ctx context.Context, aggregateID string, buffer interface
 	}
 
 	if agg.State == nil {
-		return nil, ErrEmptyState
+		return agg, ErrEmptyState
 	}
 
 	return agg, nil
