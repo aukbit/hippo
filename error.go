@@ -20,9 +20,10 @@ const (
 
 // Cache errors.
 const (
-	ErrKeyDoesNotExist          = Error("key does not exist")
-	ErrVersionFieldDoesNotExist = Error("invalid aggregate key - version field does not exist")
-	ErrStateFieldDoesNotExist   = Error("invalid aggregate key - state field does not exist")
+	ErrCacheServiceNotConfigured = Error("cache service is not configured")
+	ErrKeyDoesNotExist           = Error("key does not exist")
+	ErrVersionFieldDoesNotExist  = Error("invalid aggregate key - version field does not exist")
+	ErrStateFieldDoesNotExist    = Error("invalid aggregate key - state field does not exist")
 )
 
 // Error represents a HIPPO error.
