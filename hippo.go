@@ -173,7 +173,7 @@ func (c *Client) Dispatch(ctx context.Context, event *Event, buffer interface{},
 	}
 
 	// Fetch aggregate.
-	agg, err := c.Fetch(ctx, event.AggregateID, tmp, FetchOptions{})
+	agg, err := c.Fetch(ctx, event.AggregateID, tmp)
 	if err != nil && err != ErrAggregateIDWithoutEvents && err != ErrEmptyState {
 		return nil, err
 	}
@@ -218,45 +218,36 @@ func (c *Client) Dispatch(ctx context.Context, event *Event, buffer interface{},
 // FetchOptions is a configurable object for fetch func
 type FetchOptions struct {
 	SkipOptimisticConcurrency bool
+	CacheOnly                 bool
 }
 
 func (c *Client) doOptimisticConcurrencyCheck(ctx context.Context, agg *Aggregate) error {
 	// Get last aggregate version to do a optimistic concurrency test
 	// on the data coming in.
-	version, err := c.store.EventService().GetLastVersion(ctx, agg.id)
+	v, err := c.store.EventService().GetLastVersion(ctx, agg.id)
 	if err != nil {
 		return err
 	}
 	// Check if verssion from cache is the version expected.
-	if agg.Version != version {
+	if agg.Version != v {
 		return ErrConcurrencyException
 	}
 	return nil
 }
 
 // Fetch returns an aggregate resource based on the aggregateID and domain type
-func (c *Client) Fetch(ctx context.Context, aggregateID string, buffer interface{}, opt FetchOptions) (*Aggregate, error) {
+func (c *Client) Fetch(ctx context.Context, aggregateID string, buffer interface{}) (*Aggregate, error) {
 
-	// If CacheService is defined check in Cache first.
-	if c.cache != nil {
-		agg := &Aggregate{
-			id:    aggregateID,
-			State: buffer,
-		}
-		if err := c.cache.Get(ctx, aggregateID, agg); err == nil {
-			if opt.SkipOptimisticConcurrency {
-				return agg, nil
-			}
-			err := c.doOptimisticConcurrencyCheck(ctx, agg)
-			if err != nil {
-				return nil, err
-			}
+	agg, err := c.FetchFromCache(ctx, aggregateID, buffer)
+	if err == nil {
+		err := c.doOptimisticConcurrencyCheck(ctx, agg)
+		if err == nil {
 			return agg, nil
 		}
 	}
 
 	// Create new aggregate
-	agg := &Aggregate{id: aggregateID}
+	agg = &Aggregate{id: aggregateID}
 
 	// Fetch events from datastore
 	events, err := c.store.EventService().List(ctx, Params{ID: aggregateID})
@@ -283,5 +274,21 @@ func (c *Client) Fetch(ctx context.Context, aggregateID string, buffer interface
 		return agg, ErrEmptyState
 	}
 
+	return agg, nil
+}
+
+// FetchFromCache fetches aggregate from cache only
+func (c *Client) FetchFromCache(ctx context.Context, aggregateID string, buffer interface{}) (*Aggregate, error) {
+	// Verify if CacheService is defined.
+	if c.cache == nil {
+		return nil, ErrCacheServiceNotConfigured
+	}
+	agg := &Aggregate{
+		id:    aggregateID,
+		State: buffer,
+	}
+	if err := c.cache.Get(ctx, aggregateID, agg); err != nil {
+		return nil, err
+	}
 	return agg, nil
 }
