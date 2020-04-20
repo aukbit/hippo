@@ -52,6 +52,7 @@ type Version int64
 
 // Aggregate represents an aggregator state and respective version
 type Aggregate struct {
+	id      string
 	State   interface{}
 	Version int64
 }
@@ -172,7 +173,7 @@ func (c *Client) Dispatch(ctx context.Context, event *Event, buffer interface{},
 	}
 
 	// Fetch aggregate.
-	agg, err := c.Fetch(ctx, event.AggregateID, tmp)
+	agg, err := c.Fetch(ctx, event.AggregateID, tmp, FetchOptions{})
 	if err != nil && err != ErrAggregateIDWithoutEvents && err != ErrEmptyState {
 		return nil, err
 	}
@@ -214,31 +215,48 @@ func (c *Client) Dispatch(ctx context.Context, event *Event, buffer interface{},
 	return agg, nil
 }
 
-// Fetch returns an aggregate resource based on the aggregateID and domain type
-func (c *Client) Fetch(ctx context.Context, aggregateID string, buffer interface{}) (*Aggregate, error) {
+// FetchOptions is a configurable object for fetch func
+type FetchOptions struct {
+	SkipOptimisticConcurrency bool
+}
 
+func (c *Client) doOptimisticConcurrencyCheck(ctx context.Context, agg *Aggregate) error {
 	// Get last aggregate version to do a optimistic concurrency test
 	// on the data coming in.
-	v, err := c.store.EventService().GetLastVersion(ctx, aggregateID)
+	version, err := c.store.EventService().GetLastVersion(ctx, agg.id)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	// Check if verssion from cache is the version expected.
+	if agg.Version != version {
+		return ErrConcurrencyException
+	}
+	return nil
+}
+
+// Fetch returns an aggregate resource based on the aggregateID and domain type
+func (c *Client) Fetch(ctx context.Context, aggregateID string, buffer interface{}, opt FetchOptions) (*Aggregate, error) {
 
 	// If CacheService is defined check in Cache first.
 	if c.cache != nil {
 		agg := &Aggregate{
+			id:    aggregateID,
 			State: buffer,
 		}
 		if err := c.cache.Get(ctx, aggregateID, agg); err == nil {
-			// Check if verssion from cache is the version expected.
-			if agg.Version == v {
+			if opt.SkipOptimisticConcurrency {
 				return agg, nil
 			}
+			err := c.doOptimisticConcurrencyCheck(ctx, agg)
+			if err != nil {
+				return nil, err
+			}
+			return agg, nil
 		}
 	}
 
 	// Create new aggregate
-	agg := &Aggregate{}
+	agg := &Aggregate{id: aggregateID}
 
 	// Fetch events from datastore
 	events, err := c.store.EventService().List(ctx, Params{ID: aggregateID})
@@ -257,8 +275,8 @@ func (c *Client) Fetch(ctx context.Context, aggregateID string, buffer interface
 
 	// If the expected version does not match the actual aggregate version
 	// it will raise a concurrency exception
-	if agg.Version != v {
-		return nil, ErrConcurrencyException
+	if err := c.doOptimisticConcurrencyCheck(ctx, agg); err != nil {
+		return nil, err
 	}
 
 	if agg.State == nil {
