@@ -278,7 +278,7 @@ func TestStore_WithSubscribers(t *testing.T) {
 	// Subscribe
 	wg.Add(1)
 	c1 := make(chan *hippo.Event, 1)
-	hippo.Subscribe(c1, ev1.GetTopic())
+	hippo.Subscribe(c1, hippo.ActionTopics{ev1.GetTopic(): []hippo.ActionFn{}})
 	go func() {
 		defer wg.Done()
 		ev1 := <-c1

@@ -1,12 +1,26 @@
 package hippo
 
-import "sync"
+import (
+	"context"
+	"log"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
+)
 
 // Topic string name
 type Topic string
 
+// ActionFn signature of an action func
+type ActionFn func(context.Context, *Event) error
+
+// ActionTopics map between a topic and respective action func
+type ActionTopics map[Topic][]ActionFn
+
 type handler struct {
-	topics map[Topic]bool
+	topics ActionTopics
 }
 
 func (h *handler) valid(t Topic) bool {
@@ -14,8 +28,16 @@ func (h *handler) valid(t Topic) bool {
 	return ok
 }
 
-func (h *handler) set(t Topic) {
-	h.topics[t] = true
+func (h *handler) set(t Topic, a []ActionFn) {
+	h.topics[t] = a
+}
+
+func (h *handler) get(t Topic) []ActionFn {
+	a, ok := h.topics[t]
+	if !ok {
+		return []ActionFn{}
+	}
+	return a
 }
 
 func (h *handler) clear(t Topic) {
@@ -25,7 +47,7 @@ func (h *handler) clear(t Topic) {
 // handlers is a collection of events.
 var handlers struct {
 	sync.Mutex
-	m   map[chan<- *Event]*handler
+	m   map[chan *Event]*handler
 	ref map[Topic]int64
 }
 
@@ -44,7 +66,7 @@ var handlers struct {
 // It is allowed to call Subscribe multiple times with different channels
 // and the same events: each channel receives copies of incoming
 // events independently.
-func Subscribe(c chan<- *Event, topics ...Topic) {
+func Subscribe(c chan *Event, topics ActionTopics) {
 	if c == nil {
 		panic("pubsub: subscribe using nil channel")
 	}
@@ -55,28 +77,29 @@ func Subscribe(c chan<- *Event, topics ...Topic) {
 	h, ok := handlers.m[c]
 	if !ok {
 		if handlers.m == nil {
-			handlers.m = make(map[chan<- *Event]*handler)
+			handlers.m = make(map[chan *Event]*handler)
 		}
 		if handlers.ref == nil {
 			handlers.ref = make(map[Topic]int64)
 		}
-		h = &handler{make(map[Topic]bool)}
+		h = &handler{make(ActionTopics)}
 		handlers.m[c] = h
 	}
 
-	add := func(t Topic) {
+	add := func(t Topic, a []ActionFn) {
 		if t == "" {
 			return
 		}
 		if !h.valid(t) {
-			h.set(t)
+			h.set(t, a)
 			handlers.ref[t]++
 		}
 	}
 
-	for _, t := range topics {
-		add(t)
+	for t, actions := range topics {
+		add(t, actions)
 	}
+
 }
 
 // Publish publishes an event on the registered subscriber channels.
@@ -100,7 +123,7 @@ func publish(e *Event) {
 }
 
 // Unsubscribe remove events from the map.
-func Unsubscribe(c chan<- *Event) {
+func Unsubscribe(c chan *Event) {
 	handlers.Lock()
 	defer handlers.Unlock()
 
@@ -127,4 +150,47 @@ func Unsubscribe(c chan<- *Event) {
 	}
 
 	delete(handlers.m, c)
+}
+
+// Worker waits for events from a subscribed channel and run respective action functions
+func Worker(ctx context.Context, c chan *Event) {
+	if c == nil {
+		panic("pubsub: subscribe using nil channel")
+	}
+
+	handlers.Lock()
+	defer handlers.Unlock()
+
+	h, ok := handlers.m[c]
+	if !ok {
+		return
+	}
+
+	//  Stop also in case of any host signal
+	sigch := make(chan os.Signal, 1)
+	signal.Notify(sigch, syscall.SIGTERM, syscall.SIGINT)
+outer:
+	for {
+		select {
+		case evt := <-c:
+			if h.valid(evt.GetTopic()) {
+				actions := h.get(evt.GetTopic())
+				for _, a := range actions {
+					err := a(ctx, evt)
+					if err != nil {
+						// TODO: retry running the func in an exponential way
+						log.Printf("actionFn %v for evt %v failed > error %v", a, evt, err)
+						continue
+					}
+				}
+			}
+		case <-sigch:
+			Unsubscribe(c)
+			break outer
+		default:
+			// keep on looping, non-blocking channel operations
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+	}
 }
