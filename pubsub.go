@@ -172,11 +172,11 @@ outer:
 		case evt := <-c:
 			if h.valid(evt.GetTopic()) {
 				actions := h.get(evt.GetTopic())
-				for _, a := range actions {
+				for i, a := range actions {
 					err := a(ctx, evt)
 					if err != nil {
 						// TODO: retry running the func in an exponential way
-						log.Printf("actionFn %v for evt %v failed > error %v", a, evt, err)
+						log.Printf("pubsub: action %v failed for event %v > error %v", i, evt, err)
 						continue
 					}
 				}
