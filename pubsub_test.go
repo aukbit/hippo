@@ -99,7 +99,7 @@ func TestPubSub_Worker(t *testing.T) {
 	wg := &sync.WaitGroup{}
 	wg.Add(3)
 
-	c1 := make(chan *Event, 2)
+	c1 := make(chan *Event, 1)
 	a := func(ctx context.Context, e *Event) error {
 		defer wg.Done()
 		log.Printf("action a for evt %v", e.GetTopic())

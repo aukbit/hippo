@@ -54,10 +54,13 @@ var handlers struct {
 // If no events are provided, all incoming events will be relayed to c.
 // Otherwise, just the provided events will.
 //
-// Package pubsub will not block sending to c: the caller must ensure
-// that c has sufficient buffer space to keep up with the expected
-// event rate. For a channel used for notification of just one event value,
+// Package pubsub will block sending to c:
+// For a channel used for notification of just one event value,
 // a buffer of size 1 is sufficient.
+//
+// NOTE: Nice article that clear shows how to achieve delayed guaratee with a
+// buffer of size 1
+// https://www.ardanlabs.com/blog/2017/10/the-behavior-of-channels.html
 //
 // It is allowed to call Subscribe multiple times with the same channel:
 // each call expands the set of events sent to that channel.
@@ -112,19 +115,8 @@ func publish(e *Event) {
 
 	for c, h := range handlers.m {
 		if h.valid(Topic(e.Topic)) {
-			// TODO: show warning message when channel reaches 50% / 75% capacity
-			if len(c) >= (50 * cap(c) / 100) {
-				log.Printf("pubsub: channel 50%% full for topic %v -- handling %v events for a maximum capacity %v", e.GetTopic(), len(c), cap(c))
-			} else if len(c) >= (75 * cap(c) / 100) {
-				log.Printf("pubsub: channel 75%% full for topic %v -- handling %v events for a maximum capacity %v", e.GetTopic(), len(c), cap(c))
-			}
-			// send but do not block for it
-			select {
-			case c <- e:
-			default:
-				// keep on looping, non-blocking channel operations
-				log.Printf("pubsub: channel full -- discarding event %v", e)
-			}
+			// NOTE: block sending to c if buffer is full
+			c <- e
 		}
 	}
 }
