@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 )
 
 // Topic string name
@@ -113,10 +112,18 @@ func publish(e *Event) {
 
 	for c, h := range handlers.m {
 		if h.valid(Topic(e.Topic)) {
+			// TODO: show warning message when channel reaches 50% / 75% capacity
+			if len(c) >= (50 * cap(c) / 100) {
+				log.Printf("pubsub: channel 50%% full for topic %v -- handling %v events for a maximum capacity %v", e.GetTopic(), len(c), cap(c))
+			} else if len(c) >= (75 * cap(c) / 100) {
+				log.Printf("pubsub: channel 75%% full for topic %v -- handling %v events for a maximum capacity %v", e.GetTopic(), len(c), cap(c))
+			}
 			// send but do not block for it
 			select {
 			case c <- e:
 			default:
+				// keep on looping, non-blocking channel operations
+				log.Printf("pubsub: channel full -- discarding event %v", e)
 			}
 		}
 	}
@@ -124,6 +131,7 @@ func publish(e *Event) {
 
 // Unsubscribe remove events from the map.
 func Unsubscribe(c chan *Event) {
+
 	handlers.Lock()
 	defer handlers.Unlock()
 
@@ -158,9 +166,6 @@ func Worker(ctx context.Context, c chan *Event) {
 		panic("pubsub: subscribe using nil channel")
 	}
 
-	handlers.Lock()
-	defer handlers.Unlock()
-
 	h, ok := handlers.m[c]
 	if !ok {
 		return
@@ -189,8 +194,6 @@ outer:
 			break outer
 		default:
 			// keep on looping, non-blocking channel operations
-			time.Sleep(50 * time.Millisecond)
-			continue
 		}
 	}
 }

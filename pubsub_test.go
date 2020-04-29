@@ -1,6 +1,8 @@
 package hippo
 
 import (
+	"context"
+	"log"
 	"sync"
 	"testing"
 
@@ -82,4 +84,49 @@ func TestPubSub_MultiEventsDifferentChannels(t *testing.T) {
 	assert.Equal(t, int64(1), handlers.ref[ev2.GetTopic()])
 	Unsubscribe(c2)
 	assert.Equal(t, int64(0), handlers.ref[ev2.GetTopic()])
+}
+
+func TestPubSub_Worker(t *testing.T) {
+	u1 := pb.User{
+		Id:    rand.String(10),
+		Name:  "Luke",
+		Email: "luke@email.com",
+	}
+	ev1 := NewEventProto("user_created", u1.GetId(), &u1)
+	u1.Name = "Luke Skywalker"
+	ev2 := NewEventProto("user_updated", u1.GetId(), &u1)
+
+	wg := &sync.WaitGroup{}
+	wg.Add(3)
+
+	c1 := make(chan *Event, 2)
+	a := func(ctx context.Context, e *Event) error {
+		defer wg.Done()
+		log.Printf("action a for evt %v", e.GetTopic())
+		assert.Equal(t, "user_created", string(e.GetTopic()))
+		return nil
+	}
+	b := func(ctx context.Context, e *Event) error {
+		defer wg.Done()
+		log.Printf("action b for evt %v", e.GetTopic())
+		assert.Equal(t, "user_created", string(e.GetTopic()))
+		return nil
+	}
+	c := func(ctx context.Context, e *Event) error {
+		defer wg.Done()
+		log.Printf("action c for evt %v", e.GetTopic())
+		assert.Equal(t, "user_updated", string(e.GetTopic()))
+		return nil
+	}
+	Subscribe(c1, ActionTopics{"user_created": []ActionFn{a, b}, "user_updated": []ActionFn{c}})
+	// Launch worker
+	go Worker(context.Background(), c1)
+	// Publish
+	publish(ev1)
+	publish(ev2)
+
+	wg.Wait()
+	// Unsubscribe
+	Unsubscribe(c1)
+	//
 }
