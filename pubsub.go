@@ -105,7 +105,7 @@ func Subscribe(c chan *Event, topics ActionTopics) {
 		log.Printf("pubsub: channel %v with topic %v subscribed - duration: %v", c, t, time.Now().Sub(start))
 	}
 
-	log.Printf("pubsub DEBUG: handlers %v", handlers)
+	log.Printf("pubsub ## DEBUG ##: handlers %v", handlers)
 }
 
 // Publish publishes an event on the registered subscriber channels.
