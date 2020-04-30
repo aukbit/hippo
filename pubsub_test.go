@@ -121,7 +121,7 @@ func TestPubSub_Worker(t *testing.T) {
 	at := ActionTopics{"user_created": []ActionFn{a, b}, "user_updated": []ActionFn{c}}
 	Subscribe(c1, at)
 	// Launch worker
-	go Worker(context.Background(), c1, at)
+	go Worker(context.Background(), c1)
 	// Publish
 	publish(ev1)
 	publish(ev2)
