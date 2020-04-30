@@ -10,6 +10,6 @@ require (
 	github.com/onsi/ginkgo v1.12.0 // indirect
 	github.com/onsi/gomega v1.9.0 // indirect
 	github.com/paulormart/assert v0.1.0
-	golang.org/x/net v0.0.0-20190620200207-3b0461eec859 // indirect
+	github.com/rs/zerolog v1.18.0
 	google.golang.org/grpc v1.27.1
 )

@@ -1,12 +1,26 @@
 package hippo
 
-import "sync"
+import (
+	"context"
+	"log"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
+)
 
 // Topic string name
 type Topic string
 
+// ActionFn signature of an action func
+type ActionFn func(context.Context, *Event) error
+
+// ActionTopics map between a topic and respective action func
+type ActionTopics map[Topic][]ActionFn
+
 type handler struct {
-	topics map[Topic]bool
+	topics ActionTopics
 }
 
 func (h *handler) valid(t Topic) bool {
@@ -14,8 +28,16 @@ func (h *handler) valid(t Topic) bool {
 	return ok
 }
 
-func (h *handler) set(t Topic) {
-	h.topics[t] = true
+func (h *handler) set(t Topic, a []ActionFn) {
+	h.topics[t] = a
+}
+
+func (h *handler) get(t Topic) []ActionFn {
+	a, ok := h.topics[t]
+	if !ok {
+		return []ActionFn{}
+	}
+	return a
 }
 
 func (h *handler) clear(t Topic) {
@@ -25,7 +47,7 @@ func (h *handler) clear(t Topic) {
 // handlers is a collection of events.
 var handlers struct {
 	sync.Mutex
-	m   map[chan<- *Event]*handler
+	m   map[chan *Event]*handler
 	ref map[Topic]int64
 }
 
@@ -33,10 +55,13 @@ var handlers struct {
 // If no events are provided, all incoming events will be relayed to c.
 // Otherwise, just the provided events will.
 //
-// Package pubsub will not block sending to c: the caller must ensure
-// that c has sufficient buffer space to keep up with the expected
-// event rate. For a channel used for notification of just one event value,
+// Package pubsub will block sending to c:
+// For a channel used for notification of just one event value,
 // a buffer of size 1 is sufficient.
+//
+// NOTE: Nice article that clear shows how to achieve delayed guaratee with a
+// buffer of size 1
+// https://www.ardanlabs.com/blog/2017/10/the-behavior-of-channels.html
 //
 // It is allowed to call Subscribe multiple times with the same channel:
 // each call expands the set of events sent to that channel.
@@ -44,7 +69,8 @@ var handlers struct {
 // It is allowed to call Subscribe multiple times with different channels
 // and the same events: each channel receives copies of incoming
 // events independently.
-func Subscribe(c chan<- *Event, topics ...Topic) {
+func Subscribe(c chan *Event, topics ActionTopics) {
+	start := time.Now()
 	if c == nil {
 		panic("pubsub: subscribe using nil channel")
 	}
@@ -55,32 +81,34 @@ func Subscribe(c chan<- *Event, topics ...Topic) {
 	h, ok := handlers.m[c]
 	if !ok {
 		if handlers.m == nil {
-			handlers.m = make(map[chan<- *Event]*handler)
+			handlers.m = make(map[chan *Event]*handler)
 		}
 		if handlers.ref == nil {
 			handlers.ref = make(map[Topic]int64)
 		}
-		h = &handler{make(map[Topic]bool)}
+		h = &handler{make(ActionTopics)}
 		handlers.m[c] = h
 	}
 
-	add := func(t Topic) {
+	add := func(t Topic, a []ActionFn) {
 		if t == "" {
 			return
 		}
 		if !h.valid(t) {
-			h.set(t)
+			h.set(t, a)
 			handlers.ref[t]++
 		}
 	}
 
-	for _, t := range topics {
-		add(t)
+	for t, actions := range topics {
+		add(t, actions)
+		log.Printf("pubsub: channel %v with topic %v subscribed - duration: %v", c, t, time.Now().Sub(start))
 	}
 }
 
 // Publish publishes an event on the registered subscriber channels.
 func publish(e *Event) {
+	start := time.Now()
 	if e == nil || e.Topic == "" {
 		return
 	}
@@ -90,17 +118,16 @@ func publish(e *Event) {
 
 	for c, h := range handlers.m {
 		if h.valid(Topic(e.Topic)) {
-			// send but do not block for it
-			select {
-			case c <- e:
-			default:
-			}
+			// NOTE: block sending to c if buffer is full
+			c <- e
 		}
 	}
+	log.Printf("pubsub: event %s with aggregate %s version %d published - duration: %v", e.Topic, e.AggregateID, e.Version, time.Now().Sub(start))
 }
 
 // Unsubscribe remove events from the map.
-func Unsubscribe(c chan<- *Event) {
+func Unsubscribe(c chan *Event) {
+
 	handlers.Lock()
 	defer handlers.Unlock()
 
@@ -127,4 +154,44 @@ func Unsubscribe(c chan<- *Event) {
 	}
 
 	delete(handlers.m, c)
+}
+
+// Worker waits for events from a subscribed channel and run respective action functions
+func Worker(ctx context.Context, c chan *Event) {
+	if c == nil {
+		panic("pubsub: subscribe using nil channel")
+	}
+
+	h, ok := handlers.m[c]
+	if !ok {
+		return
+	}
+
+	//  Stop also in case of any host signal
+	sigch := make(chan os.Signal, 1)
+	signal.Notify(sigch, syscall.SIGTERM, syscall.SIGINT)
+outer:
+	for {
+		select {
+		case e := <-c:
+			actions := h.get(e.GetTopic())
+			for i, a := range actions {
+				start := time.Now()
+				err := a(ctx, e)
+				if err != nil {
+					// TODO: retry running the func in an exponential way
+					log.Printf("pubsub: action %v failed for event %v with aggregate %s version %d - duration: %v > error %v", i, e.Topic, e.AggregateID, e.Version, time.Now().Sub(start), err)
+					continue
+				}
+				log.Printf("pubsub: event %s with aggregate %s version %d action %v finished - duration: %v", e.Topic, e.AggregateID, e.Version, i, time.Now().Sub(start))
+			}
+		case <-sigch:
+			Unsubscribe(c)
+			break outer
+		default:
+			// keep on looping, non-blocking channel operations
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+	}
 }
