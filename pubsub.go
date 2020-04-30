@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 )
 
 // Topic string name
@@ -106,6 +107,7 @@ func Subscribe(c chan *Event, topics ActionTopics) {
 
 // Publish publishes an event on the registered subscriber channels.
 func publish(e *Event) {
+	start := time.Now()
 	if e == nil || e.Topic == "" {
 		return
 	}
@@ -119,6 +121,7 @@ func publish(e *Event) {
 			c <- e
 		}
 	}
+	log.Printf("pubsub: event %s with aggregate %s version %d published - duration: %v", e.Topic, e.AggregateID, e.Version, time.Now().Sub(start))
 }
 
 // Unsubscribe remove events from the map.
@@ -169,17 +172,17 @@ func Worker(ctx context.Context, c chan *Event) {
 outer:
 	for {
 		select {
-		case evt := <-c:
-			if h.valid(evt.GetTopic()) {
-				actions := h.get(evt.GetTopic())
-				for i, a := range actions {
-					err := a(ctx, evt)
-					if err != nil {
-						// TODO: retry running the func in an exponential way
-						log.Printf("pubsub: action %v failed for event %v > error %v", i, evt, err)
-						continue
-					}
+		case e := <-c:
+			actions := h.get(e.GetTopic())
+			for i, a := range actions {
+				start := time.Now()
+				err := a(ctx, e)
+				if err != nil {
+					// TODO: retry running the func in an exponential way
+					log.Printf("pubsub: action %v failed for event %v - duration: %v > error %v", i, e, time.Now().Sub(start), err)
+					continue
 				}
+				log.Printf("pubsub: event %s with aggregate %s version %d action %v finished - duration: %v", e.Topic, e.AggregateID, e.Version, i, time.Now().Sub(start))
 			}
 		case <-sigch:
 			Unsubscribe(c)
