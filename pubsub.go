@@ -174,10 +174,9 @@ outer:
 	for {
 		select {
 		case e := <-c:
-			start := time.Now()
 			actions := h.get(e.GetTopic())
-			log.Printf("pubsub: event %s with aggregate %s version %d actions retrieved - duration: %v", e.Topic, e.AggregateID, e.Version, time.Now().Sub(start))
 			for i, a := range actions {
+				start := time.Now()
 				err := a(ctx, e)
 				if err != nil {
 					// TODO: retry running the func in an exponential way
