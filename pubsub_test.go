@@ -118,9 +118,10 @@ func TestPubSub_Worker(t *testing.T) {
 		assert.Equal(t, "user_updated", string(e.GetTopic()))
 		return nil
 	}
-	Subscribe(c1, ActionTopics{"user_created": []ActionFn{a, b}, "user_updated": []ActionFn{c}})
+	at := ActionTopics{"user_created": []ActionFn{a, b}, "user_updated": []ActionFn{c}}
+	Subscribe(c1, at)
 	// Launch worker
-	go Worker(context.Background(), c1)
+	go Worker(context.Background(), c1, at)
 	// Publish
 	publish(ev1)
 	publish(ev2)

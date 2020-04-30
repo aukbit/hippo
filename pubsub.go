@@ -70,6 +70,7 @@ var handlers struct {
 // and the same events: each channel receives copies of incoming
 // events independently.
 func Subscribe(c chan *Event, topics ActionTopics) {
+	start := time.Now()
 	if c == nil {
 		panic("pubsub: subscribe using nil channel")
 	}
@@ -101,8 +102,10 @@ func Subscribe(c chan *Event, topics ActionTopics) {
 
 	for t, actions := range topics {
 		add(t, actions)
+		log.Printf("pubsub: channel %v with topic %v subscribed - duration: %v", c, t, time.Now().Sub(start))
 	}
 
+	log.Printf("pubsub DEBUG: handlers %v", handlers)
 }
 
 // Publish publishes an event on the registered subscriber channels.
@@ -156,15 +159,15 @@ func Unsubscribe(c chan *Event) {
 }
 
 // Worker waits for events from a subscribed channel and run respective action functions
-func Worker(ctx context.Context, c chan *Event) {
+func Worker(ctx context.Context, c chan *Event, topics ActionTopics) {
 	if c == nil {
 		panic("pubsub: subscribe using nil channel")
 	}
 
-	h, ok := handlers.m[c]
-	if !ok {
-		return
-	}
+	// h, ok := handlers.m[c]
+	// if !ok {
+	// 	return
+	// }
 
 	//  Stop also in case of any host signal
 	sigch := make(chan os.Signal, 1)
@@ -173,13 +176,20 @@ outer:
 	for {
 		select {
 		case e := <-c:
-			actions := h.get(e.GetTopic())
+			start := time.Now()
+
+			actions, ok := topics[e.GetTopic()]
+			if !ok {
+				log.Printf("pubsub: topics do not contain event %v - duration: %v", e.Topic, time.Now().Sub(start))
+				continue
+			}
+
+			// actions := h.get(e.GetTopic())
 			for i, a := range actions {
-				start := time.Now()
 				err := a(ctx, e)
 				if err != nil {
 					// TODO: retry running the func in an exponential way
-					log.Printf("pubsub: action %v failed for event %v - duration: %v > error %v", i, e, time.Now().Sub(start), err)
+					log.Printf("pubsub: action %v failed for event %v with aggregate %s version %d - duration: %v > error %v", i, e.Topic, e.AggregateID, e.Version, time.Now().Sub(start), err)
 					continue
 				}
 				log.Printf("pubsub: event %s with aggregate %s version %d action %v finished - duration: %v", e.Topic, e.AggregateID, e.Version, i, time.Now().Sub(start))
