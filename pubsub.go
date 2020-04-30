@@ -104,8 +104,6 @@ func Subscribe(c chan *Event, topics ActionTopics) {
 		add(t, actions)
 		log.Printf("pubsub: channel %v with topic %v subscribed - duration: %v", c, t, time.Now().Sub(start))
 	}
-
-	log.Printf("pubsub ## DEBUG ##: handlers %v", handlers)
 }
 
 // Publish publishes an event on the registered subscriber channels.
@@ -193,7 +191,7 @@ outer:
 			break outer
 		default:
 			// keep on looping, non-blocking channel operations
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 			continue
 		}
 	}
