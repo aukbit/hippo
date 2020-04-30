@@ -159,15 +159,15 @@ func Unsubscribe(c chan *Event) {
 }
 
 // Worker waits for events from a subscribed channel and run respective action functions
-func Worker(ctx context.Context, c chan *Event, topics ActionTopics) {
+func Worker(ctx context.Context, c chan *Event) {
 	if c == nil {
 		panic("pubsub: subscribe using nil channel")
 	}
 
-	// h, ok := handlers.m[c]
-	// if !ok {
-	// 	return
-	// }
+	h, ok := handlers.m[c]
+	if !ok {
+		return
+	}
 
 	//  Stop also in case of any host signal
 	sigch := make(chan os.Signal, 1)
@@ -177,14 +177,8 @@ outer:
 		select {
 		case e := <-c:
 			start := time.Now()
-
-			actions, ok := topics[e.GetTopic()]
-			if !ok {
-				log.Printf("pubsub: topics do not contain event %v - duration: %v", e.Topic, time.Now().Sub(start))
-				continue
-			}
-
-			// actions := h.get(e.GetTopic())
+			actions := h.get(e.GetTopic())
+			log.Printf("pubsub: event %s with aggregate %s version %d actions retrieved - duration: %v", e.Topic, e.AggregateID, e.Version, time.Now().Sub(start))
 			for i, a := range actions {
 				err := a(ctx, e)
 				if err != nil {
