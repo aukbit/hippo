@@ -190,7 +190,7 @@ outer:
 			break outer
 		default:
 			// keep on looping, non-blocking channel operations
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(time.Millisecond)
 			continue
 		}
 	}
